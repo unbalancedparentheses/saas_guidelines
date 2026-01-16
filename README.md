@@ -1867,548 +1867,183 @@ export const test = base.extend<{ authenticatedPage: Page }>({
 });
 ```
 
-**Critical User Journeys to Test**
+**Critical User Journeys to Test**: sign up flow (email verification if applicable), login/logout, password reset, onboarding wizard, core CRUD operations, billing flow (upgrade, downgrade, cancel), team invite and accept, settings changes persist, error states display correctly.
 
-- [ ] Sign up flow (email verification if applicable)
-- [ ] Login / logout
-- [ ] Password reset
-- [ ] Onboarding wizard
-- [ ] Core CRUD operations (create, read, update, delete)
-- [ ] Billing flow (upgrade, downgrade, cancel)
-- [ ] Team invite and accept
-- [ ] Settings changes persist
-- [ ] Error states display correctly
-
-**Implementation Checklist**
-
-- [ ] Install Playwright: `pnpm create playwright`
-- [ ] Configure `playwright.config.ts` with base URL
-- [ ] Create page objects for main pages
-- [ ] Write tests for critical user journeys
-- [ ] Set up test database seeding for E2E
-- [ ] Add to CI pipeline (run on PR, before deploy)
-- [ ] Configure retries for flaky network tests
-- [ ] Use `test.describe.serial` for order-dependent tests
-- [ ] Screenshot on failure for debugging
-- [ ] Run in headless mode in CI
-
-**CI Configuration**
-
-```yaml
-# .github/workflows/e2e.yml
-e2e:
-  runs-on: ubuntu-latest
-  steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-node@v4
-    - run: pnpm install
-    - run: pnpm exec playwright install --with-deps
-    - run: pnpm exec playwright test
-    - uses: actions/upload-artifact@v4
-      if: failure()
-      with:
-        name: playwright-report
-        path: playwright-report/
-```
+Install Playwright: `pnpm create playwright`. Configure `playwright.config.ts` with base URL. Create page objects for main pages. Write tests for critical user journeys. Set up test database seeding for E2E. Add to CI pipeline (run on PR, before deploy). Configure retries for flaky network tests. Use `test.describe.serial` for order-dependent tests. Screenshot on failure for debugging. Run in headless mode in CI.
 
 ### Performance Testing
 
-- [ ] Define load test scenarios
-- [ ] Test with realistic data volumes
-- [ ] Establish baseline metrics
-- [ ] Run before major releases
+Define load test scenarios. Test with realistic data volumes. Establish baseline metrics. Run before major releases.
 
 ---
 
 # User Impersonation
 
-Allow admins to view the app as another user for support and debugging.
+Allow super admins to view the app as another user for support and debugging. Full audit logging for accountability. Show visible banner to prevent confusion. Read-only or full access depends on use case.
 
-## Key Decisions
+## Backend
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Access | Super admin only | Sensitive capability |
-| Audit | Full logging | Accountability |
-| Indicator | Visible banner | Prevent confusion |
-| Actions | Read-only or full | Depends on use case |
+Create impersonation endpoint (admin only). Store original admin ID in session alongside impersonated user. Check impersonation permission (super admin role). Log impersonation start/end with admin ID, target user, timestamp. Optionally restrict write operations while impersonating.
 
-## Implementation Checklist
+Add `impersonator_id` to session data. Create `impersonating?/1` helper function. Create `stop_impersonating/1` to restore admin session. Auto-expire impersonation after timeout (30 minutes).
 
-### Backend
+API endpoints: `POST /api/admin/impersonate/:user_id` (start), `POST /api/admin/stop-impersonation` (return to admin), `GET /api/account/me` (include `impersonated_by` field if active).
 
-- [ ] Create impersonation endpoint (admin only)
-- [ ] Store original admin ID in session alongside impersonated user
-- [ ] Check impersonation permission (super admin role)
-- [ ] Log impersonation start/end with admin ID, target user, timestamp
-- [ ] Optionally restrict write operations while impersonating
+## Frontend
 
-### Session Management
+Show prominent banner when impersonating ("Viewing as user@example.com"). Include "Stop impersonation" button. Use different header/theme color during impersonation. Disable or warn on destructive actions.
 
-- [ ] Add `impersonator_id` to session data
-- [ ] Create `impersonating?/1` helper function
-- [ ] Create `stop_impersonating/1` to restore admin session
-- [ ] Auto-expire impersonation after timeout (30 minutes)
+## Security
 
-### API Endpoints
-
-- [ ] `POST /api/admin/impersonate/:user_id` - Start impersonation
-- [ ] `POST /api/admin/stop-impersonation` - Return to admin
-- [ ] `GET /api/account/me` - Include `impersonated_by` field if active
-
-### Frontend
-
-- [ ] Show prominent banner when impersonating ("Viewing as user@example.com")
-- [ ] Include "Stop impersonation" button in banner
-- [ ] Use different header/theme color during impersonation
-- [ ] Disable or warn on destructive actions
-
-### Security
-
-- [ ] Require 2FA before impersonating
-- [ ] Limit impersonation to lower-privilege users (no admin-to-admin)
-- [ ] Log all actions taken while impersonating
-- [ ] Alert user that their account was accessed by support (optional)
-- [ ] IP/location restrictions for impersonation
+Require 2FA before impersonating. Limit impersonation to lower-privilege users (no admin-to-admin). Log all actions taken while impersonating. Optionally alert user that their account was accessed by support. Consider IP/location restrictions for impersonation.
 
 ---
 
 # Admin Dashboard
 
-Internal tools for managing users, content, and system health.
+Internal tools for managing users, content, and system health. Use role-based access (admin, super_admin roles). Separate namespace (`/admin/*` paths). Same auth system plus role check.
 
-## Key Decisions
+## Authentication & Authorization
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Access | Role-based | admin, super_admin roles |
-| Routes | Separate namespace | `/admin/*` paths |
-| Auth | Same system + role check | Unified authentication |
+Create admin role(s) in user schema. Create AdminAuth plug checking admin role. Separate admin routes in router (`/admin` scope). Log all admin actions.
 
-## Implementation Checklist
+## Dashboard Sections
 
-### Authentication & Authorization
+**User Management**: user list with search, filter, pagination; user detail view (profile, activity, sessions); edit user (role, status, email verification); impersonate user; suspend/ban user; delete/anonymize user (GDPR).
 
-- [ ] Create admin role(s) in user schema
-- [ ] Create AdminAuth plug checking admin role
-- [ ] Separate admin routes in router (`/admin` scope)
-- [ ] Log all admin actions
+**Content Moderation** (if applicable): flagged content queue, approve/reject/delete actions, ban content creators.
 
-### Dashboard Sections
+**System Health**: background job queue status, error rates and recent errors, database/cache connection status, feature flag status.
 
-#### User Management
+**Billing** (if applicable): subscription overview, revenue metrics, failed payment alerts, manual subscription adjustments.
 
-- [ ] User list with search, filter, pagination
-- [ ] User detail view (profile, activity, sessions)
-- [ ] Edit user (role, status, email verification)
-- [ ] Impersonate user
-- [ ] Suspend/ban user
-- [ ] Delete/anonymize user (GDPR)
+## API Endpoints
 
-#### Content Moderation (if applicable)
+`GET /api/admin/users` (list with filters), `GET /api/admin/users/:id` (user details), `PATCH /api/admin/users/:id` (update), `POST /api/admin/users/:id/suspend` (suspend), `GET /api/admin/stats` (dashboard metrics).
 
-- [ ] Flagged content queue
-- [ ] Approve/reject/delete actions
-- [ ] Ban content creators
+## Security
 
-#### System Health
-
-- [ ] Background job queue status
-- [ ] Error rates and recent errors
-- [ ] Database/cache connection status
-- [ ] Feature flag status
-
-#### Billing (if applicable)
-
-- [ ] Subscription overview
-- [ ] Revenue metrics
-- [ ] Failed payment alerts
-- [ ] Manual subscription adjustments
-
-### API Endpoints
-
-- [ ] `GET /api/admin/users` - List users (with filters)
-- [ ] `GET /api/admin/users/:id` - User details
-- [ ] `PATCH /api/admin/users/:id` - Update user
-- [ ] `POST /api/admin/users/:id/suspend` - Suspend user
-- [ ] `GET /api/admin/stats` - Dashboard metrics
-
-### Security
-
-- [ ] All admin routes require admin role
-- [ ] Audit log all admin actions
-- [ ] Rate limit admin endpoints
-- [ ] Two-factor required for admin access
-- [ ] IP allowlist for admin routes (optional)
+All admin routes require admin role. Audit log all admin actions. Rate limit admin endpoints. Two-factor required for admin access. IP allowlist for admin routes (optional).
 
 ---
 
 # In-App Notifications
 
-Real-time notifications within the application UI.
+Real-time notifications within the application UI. Use Phoenix Channels for real-time push. Store in database for persistence and history. Support multiple channels (in-app, email, push).
 
-## Key Decisions
+## Database Schema
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Delivery | Phoenix Channels | Real-time push |
-| Storage | Database | Persistence, history |
-| Types | Multiple channels | In-app, email, push |
+The `notifications` table stores: `id` (uuid), `user_id` (recipient), `type` ("mention", "comment", "system"), `title`, `body`, `data` (jsonb for links/references), `read_at`, `seen_at`, `inserted_at`.
 
-## Database Schema (notifications table)
+## Backend
 
-- `id` (uuid) - Primary key
-- `user_id` (foreign key) - Recipient
-- `type` (string) - Notification type ("mention", "comment", "system")
-- `title` (string) - Short title
-- `body` (text) - Notification content
-- `data` (jsonb) - Structured payload (links, references)
-- `read_at` (datetime, nullable) - When read
-- `seen_at` (datetime, nullable) - When seen (in list)
-- `inserted_at` - Timestamp
+Create Notifications context with: `create_notification/2` (create and broadcast), `list_notifications/2` (paginated, unread first), `mark_as_read/2`, `mark_all_as_read/1`, `unread_count/1` (for badge). Broadcast new notifications via Phoenix Channel.
 
-## Implementation Checklist
+Create user notifications channel (`user:notifications:{user_id}`). Broadcast on notification create with full payload. Handle reconnection (fetch missed notifications).
 
-### Backend
+API endpoints: `GET /api/notifications` (list), `POST /api/notifications/:id/read` (mark as read), `POST /api/notifications/read-all` (mark all as read), `GET /api/notifications/unread-count` (badge count).
 
-- [ ] Create Notifications context
-- [ ] `create_notification/2` - Create and broadcast
-- [ ] `list_notifications/2` - Paginated, unread first
-- [ ] `mark_as_read/2` - Mark single notification
-- [ ] `mark_all_as_read/1` - Mark all for user
-- [ ] `unread_count/1` - Get count for badge
-- [ ] Broadcast new notifications via Phoenix Channel
+## Frontend
 
-### Real-time Delivery
+Notification bell icon with unread count badge. Notification dropdown/panel. Mark as read on view. Click to navigate to related resource. Real-time updates via WebSocket. Toast/popup for new notifications.
 
-- [ ] Create user notifications channel (`user:notifications:{user_id}`)
-- [ ] Broadcast on notification create
-- [ ] Include notification payload in broadcast
-- [ ] Handle reconnection (fetch missed notifications)
-
-### API Endpoints
-
-- [ ] `GET /api/notifications` - List notifications
-- [ ] `POST /api/notifications/:id/read` - Mark as read
-- [ ] `POST /api/notifications/read-all` - Mark all as read
-- [ ] `GET /api/notifications/unread-count` - Badge count
-
-### Frontend
-
-- [ ] Notification bell icon with unread count badge
-- [ ] Notification dropdown/panel
-- [ ] Mark as read on view
-- [ ] Click to navigate to related resource
-- [ ] Real-time updates via WebSocket
-- [ ] Toast/popup for new notifications
-
-### Notification Types
-
-- [ ] System announcements
-- [ ] User mentions
-- [ ] Comment replies
-- [ ] Assignment notifications
-- [ ] Billing alerts
-- [ ] Security alerts (new login, password change)
+Notification types: system announcements, user mentions, comment replies, assignment notifications, billing alerts, security alerts (new login, password change).
 
 ---
 
 # Accessibility (A11Y)
 
-Build an accessible application that works for everyone.
+Build an accessible application that works for everyone. Target WCAG 2.1 AA (industry standard, legal compliance). Use Radix UI for accessible primitives. Use axe-core for automated accessibility testing.
 
-## Key Decisions
+## Semantic HTML
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Standard | WCAG 2.1 AA | Industry standard, legal compliance |
-| Components | Radix UI | Accessible primitives |
-| Testing | axe-core | Automated accessibility testing |
+Use proper heading hierarchy (h1 > h2 > h3). Use semantic elements (nav, main, article, aside). Use button for actions, a for navigation. Use lists for list content (ul, ol). Use tables for tabular data (with headers).
 
-## Implementation Checklist
+## Keyboard Navigation
 
-### Semantic HTML
+All interactive elements must be focusable. Visible focus indicators (never just outline: none). Logical tab order. Skip to main content link. Escape closes modals/dropdowns. Arrow keys for menus and lists.
 
-- [ ] Use proper heading hierarchy (h1 > h2 > h3)
-- [ ] Use semantic elements (nav, main, article, aside)
-- [ ] Use button for actions, a for navigation
-- [ ] Use lists for list content (ul, ol)
-- [ ] Use tables for tabular data (with headers)
+## Screen Readers
 
-### Keyboard Navigation
+Alt text for all images. ARIA labels for icon buttons. ARIA live regions for dynamic content. Proper form labels (associated with inputs). Error messages announced.
 
-- [ ] All interactive elements focusable
-- [ ] Visible focus indicators (not just outline: none)
-- [ ] Logical tab order
-- [ ] Skip to main content link
-- [ ] Escape closes modals/dropdowns
-- [ ] Arrow keys for menus and lists
+## Visual
 
-### Screen Readers
+Color contrast ratio 4.5:1 minimum (text). Don't rely on color alone for meaning. Resizable text (up to 200%). Responsive at all zoom levels. Reduced motion support (`prefers-reduced-motion`).
 
-- [ ] Alt text for all images
-- [ ] ARIA labels for icon buttons
-- [ ] ARIA live regions for dynamic content
-- [ ] Proper form labels (associated with inputs)
-- [ ] Error messages announced
+## Forms
 
-### Visual
+Labels associated with inputs. Error messages linked to fields (aria-describedby). Required fields indicated. Autocomplete attributes. Fieldsets for grouped inputs.
 
-- [ ] Color contrast ratio 4.5:1 minimum (text)
-- [ ] Don't rely on color alone for meaning
-- [ ] Resizable text (up to 200%)
-- [ ] Responsive at all zoom levels
-- [ ] Reduced motion support (`prefers-reduced-motion`)
+## Automated Testing with axe-core
 
-### Forms
+Add @axe-core/react for dev-time feedback. Add jest-axe for component tests. Add @axe-core/playwright for E2E tests. Run a11y tests in CI pipeline. Block PRs with accessibility violations. Test critical user flows with screen reader. Test with keyboard-only navigation. Verify at 200% browser zoom.
 
-- [ ] Labels associated with inputs
-- [ ] Error messages linked to fields (aria-describedby)
-- [ ] Required fields indicated
-- [ ] Autocomplete attributes
-- [ ] Fieldsets for grouped inputs
-
-### Automated Testing with axe-core
-
-Catch accessibility issues automatically in development and CI.
-
-#### Development Setup
-
-```typescript
-// Install: pnpm add -D @axe-core/react
-// main.tsx (dev only)
-import React from 'react';
-import ReactDOM from 'react-dom';
-
-if (process.env.NODE_ENV === 'development') {
-  import('@axe-core/react').then(axe => {
-    axe.default(React, ReactDOM, 1000);
-  });
-}
-```
-
-#### Component Testing
-
-```typescript
-// Install: pnpm add -D jest-axe
-import { axe, toHaveNoViolations } from 'jest-axe';
-
-expect.extend(toHaveNoViolations);
-
-test('Button is accessible', async () => {
-  const { container } = render(<Button>Click me</Button>);
-  const results = await axe(container);
-  expect(results).toHaveNoViolations();
-});
-```
-
-#### E2E Testing (Playwright)
-
-```typescript
-// Install: pnpm add -D @axe-core/playwright
-import { test, expect } from '@playwright/test';
-import AxeBuilder from '@axe-core/playwright';
-
-test('homepage is accessible', async ({ page }) => {
-  await page.goto('/');
-  const results = await new AxeBuilder({ page }).analyze();
-  expect(results.violations).toEqual([]);
-});
-
-test('dashboard is accessible', async ({ page }) => {
-  await page.goto('/dashboard');
-  const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa'])
-    .analyze();
-  expect(results.violations).toEqual([]);
-});
-```
-
-#### CI Integration
-
-```yaml
-# Run accessibility tests in CI
-- name: Accessibility Tests
-  run: pnpm test:a11y
-
-- name: Playwright A11y
-  run: pnpm playwright test --grep @a11y
-```
-
-#### Implementation Checklist
-
-- [ ] Add @axe-core/react for dev-time feedback
-- [ ] Add jest-axe for component tests
-- [ ] Add @axe-core/playwright for E2E tests
-- [ ] Run a11y tests in CI pipeline
-- [ ] Block PRs with accessibility violations
-- [ ] Test critical user flows with screen reader
-- [ ] Test with keyboard-only navigation
-- [ ] Verify at 200% browser zoom
-
-### Radix UI Integration
-
-- [ ] Use Radix primitives (Dialog, Dropdown, Tabs, etc.)
-- [ ] Follow Radix accessibility patterns
-- [ ] Don't override accessibility features
-- [ ] Test compound components
+Use Radix primitives (Dialog, Dropdown, Tabs, etc.). Follow Radix accessibility patterns. Don't override accessibility features. Test compound components.
 
 ---
 
 # Onboarding Flow
 
-Guide new users through setup to increase activation and reduce churn.
+Guide new users through setup to increase activation and reduce churn. Use checklist plus contextual help for clear progress and in-context guidance. Persist in database to track completion across sessions. Make it skippable to not block power users.
 
-## Key Decisions
+## Database Schema
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Style | Checklist + contextual | Clear progress, in-context help |
-| Persistence | Database | Track completion across sessions |
-| Skippable | Yes | Don't block power users |
+The `user_onboarding` table stores: `user_id`, `completed_steps` (array of strings), `current_step`, `skipped_at`, `completed_at`, timestamps.
 
-## Database Schema (user_onboarding table)
+## Example Steps
 
-- `user_id` (foreign key) - User being onboarded
-- `completed_steps` (array of strings) - Completed step IDs
-- `current_step` (string, nullable) - Current step ID
-- `skipped_at` (datetime, nullable) - If user skipped onboarding
-- `completed_at` (datetime, nullable) - When fully completed
-- `inserted_at`, `updated_at`
+Welcome/account setup (name, avatar), connect integrations, create first resource (project, workspace), invite team members, enable notifications, complete profile.
 
-## Implementation Checklist
+## Backend
 
-### Onboarding Steps (Example)
+Create Onboarding context with: `get_onboarding_status/1` (get user's current state), `complete_step/2` (mark step complete), `skip_onboarding/1`, `reset_onboarding/1` (for testing/support). Track completion metrics.
 
-- [ ] Welcome / account setup (name, avatar)
-- [ ] Connect integrations (if applicable)
-- [ ] Create first resource (project, workspace)
-- [ ] Invite team members
-- [ ] Enable notifications
-- [ ] Complete profile
+API endpoints: `GET /api/onboarding` (current status and next steps), `POST /api/onboarding/steps/:step/complete` (mark complete), `POST /api/onboarding/skip` (skip remaining).
 
-### Backend
+## Frontend
 
-- [ ] Create Onboarding context
-- [ ] `get_onboarding_status/1` - Get user's current state
-- [ ] `complete_step/2` - Mark step as complete
-- [ ] `skip_onboarding/1` - Allow skipping
-- [ ] `reset_onboarding/1` - For testing/support
-- [ ] Track completion metrics
+Onboarding checklist component (sidebar or modal). Progress indicator (3 of 5 steps complete). Contextual tooltips and highlights. "Skip for now" option. Celebration on completion. Re-access onboarding from help menu.
 
-### API Endpoints
+Highlight UI elements with tooltips. Show empty states with CTAs. Provide sample data option. Link to documentation.
 
-- [ ] `GET /api/onboarding` - Get current status and next steps
-- [ ] `POST /api/onboarding/steps/:step/complete` - Mark complete
-- [ ] `POST /api/onboarding/skip` - Skip remaining steps
+## Analytics
 
-### Frontend
-
-- [ ] Onboarding checklist component (sidebar or modal)
-- [ ] Progress indicator (3 of 5 steps complete)
-- [ ] Contextual tooltips and highlights
-- [ ] "Skip for now" option
-- [ ] Celebration on completion (confetti!)
-- [ ] Re-access onboarding from help menu
-
-### Contextual Guidance
-
-- [ ] Highlight UI elements with tooltips
-- [ ] Show empty states with CTAs
-- [ ] Provide sample data option
-- [ ] Link to documentation
-
-### Analytics
-
-- [ ] Track step completion rates
-- [ ] Identify drop-off points
-- [ ] Measure time to complete
-- [ ] Correlate with retention
+Track step completion rates. Identify drop-off points. Measure time to complete. Correlate with retention.
 
 ---
 
 # Product Analytics
 
-Track user behavior to understand usage patterns and improve the product.
+Track user behavior to understand usage patterns and improve the product. Use PostHog (self-hosted for privacy and cost control), Mixpanel, or Amplitude. Require consent for GDPR compliance.
 
-## Key Decisions
+## Setup
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Provider | PostHog / Mixpanel / Amplitude | Feature-rich, self-host option |
-| Self-hosted | PostHog | Privacy, cost control |
-| Consent | Required for GDPR | Legal compliance |
+Choose analytics provider. Install SDK (frontend and/or backend). Configure user identification. Set up development vs production environments. Respect Do Not Track / consent preferences.
 
-## Implementation Checklist
+Identify users on login with user ID. Set user properties (plan, role, signup date). Handle anonymous → identified transition. Reset on logout.
 
-### Setup
+## Events to Track
 
-- [ ] Choose analytics provider
-- [ ] Install SDK (frontend and/or backend)
-- [ ] Configure user identification
-- [ ] Set up development vs production environments
-- [ ] Respect Do Not Track / consent preferences
+**Core product events**: feature usage (which features, how often), key actions (create, edit, delete), search queries, error occurrences.
 
-### User Identification
+**Engagement events**: session start/end, page/screen views, time on page, scroll depth.
 
-- [ ] Identify users on login with user ID
-- [ ] Set user properties (plan, role, signup date)
-- [ ] Handle anonymous → identified transition
-- [ ] Reset on logout
+**Conversion events**: signup completed, onboarding step completed, subscription started, feature adoption (first use of key features).
 
-### Events to Track
+## Integration
 
-#### Core Product Events
+Frontend: create analytics wrapper/hook, track page views on navigation, track clicks on key buttons, track form submissions, include relevant properties with events.
 
-- [ ] Feature usage (which features, how often)
-- [ ] Key actions (create, edit, delete resources)
-- [ ] Search queries
-- [ ] Error occurrences
+Backend (optional): track server-side events for accuracy, subscription events from Stripe webhooks, background job completions, API usage metrics.
 
-#### Engagement Events
+## Privacy & Compliance
 
-- [ ] Session start/end
-- [ ] Page/screen views
-- [ ] Time on page
-- [ ] Scroll depth (for content)
+Honor cookie consent choices. Provide opt-out mechanism. Don't track PII unnecessarily. Document what's tracked in privacy policy. Support data deletion requests.
 
-#### Conversion Events
+## Dashboards
 
-- [ ] Signup completed
-- [ ] Onboarding step completed
-- [ ] Subscription started
-- [ ] Feature adoption (first use of key features)
-
-### Frontend Integration
-
-- [ ] Create analytics wrapper/hook
-- [ ] Track page views on navigation
-- [ ] Track clicks on key buttons
-- [ ] Track form submissions
-- [ ] Include relevant properties with events
-
-### Backend Integration (Optional)
-
-- [ ] Track server-side events for accuracy
-- [ ] Subscription events from Stripe webhooks
-- [ ] Background job completions
-- [ ] API usage metrics
-
-### Privacy & Compliance
-
-- [ ] Honor cookie consent choices
-- [ ] Provide opt-out mechanism
-- [ ] Don't track PII unnecessarily
-- [ ] Document what's tracked in privacy policy
-- [ ] Support data deletion requests
-
-### Dashboards
-
-- [ ] Daily/weekly/monthly active users
-- [ ] Feature adoption rates
-- [ ] Conversion funnels
-- [ ] Retention cohorts
-- [ ] Power user identification
+Daily/weekly/monthly active users, feature adoption rates, conversion funnels, retention cohorts, power user identification.
 
 ---
 
@@ -2460,67 +2095,35 @@ Allow users to invite others to join their team or organization.
 
 Index: unique on `(team_id, email)` where not accepted/declined/revoked
 
-## Implementation Checklist
+## Implementation
 
 ### Backend
 
-- [ ] Create Invitations context
-- [ ] `create_invitation/3` - Create and send invitation
-- [ ] `accept_invitation/2` - Accept and add to team
-- [ ] `decline_invitation/1` - Decline invitation
-- [ ] `revoke_invitation/1` - Cancel pending invitation
-- [ ] `list_pending_invitations/1` - For team settings
-- [ ] Check for existing user with email
+Create an Invitations context with functions for the full invitation lifecycle: `create_invitation/3` to create and send, `accept_invitation/2` to accept and add to team, `decline_invitation/1` and `revoke_invitation/1` for rejection flows, and `list_pending_invitations/1` for team settings. Always check if the email already belongs to an existing team member.
 
 ### Invitation Flow
 
-1. User enters email and selects role
-2. Check if email already on team (error)
-3. Check for existing pending invitation (resend or error)
-4. Create invitation with secure token
-5. Send invitation email
-6. Recipient clicks link
-7. If logged in as different user: prompt to switch or decline
-8. If not logged in: login or create account
-9. After auth: auto-accept invitation
-10. Add user to team with role
+The user enters an email and selects a role. The system checks if the email is already on the team (error) and checks for existing pending invitations (offer resend or error). Create the invitation with a secure token and send the invitation email. When the recipient clicks the link: if logged in as a different user, prompt to switch or decline; if not logged in, prompt to login or create account. After authentication, auto-accept the invitation and add the user to the team with the assigned role.
 
 ### API Endpoints
 
-- [ ] `POST /api/teams/:team_id/invitations` - Send invitation
-- [ ] `GET /api/teams/:team_id/invitations` - List pending
-- [ ] `DELETE /api/teams/:team_id/invitations/:id` - Revoke
-- [ ] `POST /api/invitations/:token/accept` - Accept
-- [ ] `POST /api/invitations/:token/decline` - Decline
-- [ ] `GET /api/invitations/:token` - Get invitation details (for preview)
+Implement these endpoints: `POST /api/teams/:team_id/invitations` to send, `GET /api/teams/:team_id/invitations` to list pending, `DELETE /api/teams/:team_id/invitations/:id` to revoke, `POST /api/invitations/:token/accept` and `POST /api/invitations/:token/decline` for recipient actions, and `GET /api/invitations/:token` to get invitation details for the preview page.
 
 ### Email
 
-- [ ] Invitation email with team name, inviter name
-- [ ] Clear call-to-action button
-- [ ] Expiration notice
-- [ ] Link to decline (optional)
+The invitation email should include the team name and inviter name, a clear call-to-action button, expiration notice, and optionally a link to decline.
 
 ### Frontend
 
-- [ ] Invite form (email input, role selector)
-- [ ] Pending invitations list with resend/revoke
-- [ ] Invitation accept page
-- [ ] Handle logged-in-as-wrong-user case
-- [ ] Success message after accepting
+Build an invite form with email input and role selector, a pending invitations list with resend/revoke actions, and an invitation accept page. Handle the logged-in-as-wrong-user case gracefully and show a success message after accepting.
 
 ### Edge Cases
 
-- [ ] User already on team: show error
-- [ ] Invitation expired: show error with option to request new
-- [ ] Duplicate invitation: option to resend or update role
-- [ ] Invitee deletes account: clean up invitations
-- [ ] Team deleted: invalidate all invitations
+Handle these scenarios: user already on team (show error), invitation expired (show error with option to request new), duplicate invitation (option to resend or update role), invitee deletes account (clean up invitations), and team deleted (invalidate all invitations).
 
 ### Notifications
 
-- [ ] Notify team admins of accepted invitations
-- [ ] Reminder email before expiration (optional)
+Notify team admins when invitations are accepted. Optionally send reminder emails before expiration.
 
 ---
 
@@ -2528,50 +2131,27 @@ Index: unique on `(team_id, email)` where not accepted/declined/revoked
 
 ## A/B Testing Framework
 
-- [ ] Implement experiment assignment (user bucketing)
-- [ ] Track experiment participation
-- [ ] Collect metrics per variant
-- [ ] Build analysis dashboard
-- [ ] Consider: Growthbook, Optimizely, or custom
+Implement experiment assignment with user bucketing to randomly assign users to variants. Track experiment participation and collect metrics per variant. Build an analysis dashboard to evaluate results. Consider using Growthbook, Optimizely, or building a custom solution depending on your needs and scale.
 
 ## Referral System
 
-- [ ] Generate unique referral codes per user
-- [ ] Track referral signups
-- [ ] Implement reward logic (credits, discounts)
-- [ ] Prevent fraud (same IP, fake accounts)
-- [ ] Build referral dashboard
+Generate unique referral codes per user and track referral signups. Implement reward logic for credits, discounts, or other incentives. Prevent fraud by checking for same IP addresses, fake accounts, and suspicious patterns. Build a referral dashboard for users to see their referral stats and rewards.
 
 ## Notification Preferences
 
-- [ ] Define notification types (email, push, in-app)
-- [ ] Create preferences schema per user
-- [ ] Build preferences UI (matrix of type x channel)
-- [ ] Respect preferences in notification sending
-- [ ] Support notification digests
+Define notification types across channels (email, push, in-app). Create a preferences schema per user and build a preferences UI showing a matrix of notification type by channel. Respect these preferences when sending notifications. Support notification digests to batch multiple notifications into periodic summaries.
 
 ## Bulk Import
 
-- [ ] Support CSV upload for batch data
-- [ ] Validate data before processing
-- [ ] Process in background job
-- [ ] Provide progress feedback
-- [ ] Generate import report with errors
+Support CSV upload for batch data import. Validate all data before processing and run the import in a background job. Provide progress feedback during processing and generate an import report showing successes and errors with row-level details.
 
 ## Status Page
 
-- [ ] Display service health publicly
-- [ ] Track incident history
-- [ ] Allow subscription to updates
-- [ ] Consider: Statuspage.io, Instatus, or custom
+Display service health publicly so users can check system status. Track incident history with postmortems. Allow users to subscribe to updates via email or RSS. Consider Statuspage.io, Instatus, or building a custom solution.
 
 ## OpenTelemetry
 
-- [ ] Add OpenTelemetry SDK
-- [ ] Instrument Phoenix and Ecto
-- [ ] Configure exporter (Jaeger, Honeycomb, etc.)
-- [ ] Add custom spans for business operations
-- [ ] Correlate logs with traces
+Add the OpenTelemetry SDK and instrument Phoenix and Ecto for automatic span creation. Configure an exporter for your observability backend (Jaeger, Honeycomb, Datadog, etc.). Add custom spans for important business operations. Correlate logs with traces using trace IDs for end-to-end request debugging.
 
 ---
 
