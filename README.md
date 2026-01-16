@@ -899,10 +899,7 @@ Repo.preload(users, [organization: :subscription, roles: :permissions])
 
 ### Detection
 
-- [ ] Use `ecto_dev_logger` in development (logs all queries)
-- [ ] Review query counts in test logs
-- [ ] Monitor query count per request in production
-- [ ] Set up alerts for endpoints exceeding query threshold
+Use `ecto_dev_logger` in development to log all queries. Review query counts in test logs. Monitor query count per request in production and set up alerts for endpoints exceeding query thresholds.
 
 ## Indexing
 
@@ -921,11 +918,7 @@ Proper indexes are critical for query performance. Understand when and how to us
 
 ### When to Add Indexes
 
-- [ ] Foreign keys (always - prevents full table scans on JOINs)
-- [ ] Columns in WHERE clauses
-- [ ] Columns in ORDER BY clauses
-- [ ] Columns in JOIN conditions
-- [ ] Unique constraints (automatically creates index)
+Add indexes for: foreign keys (always—prevents full table scans on JOINs), columns in WHERE clauses, columns in ORDER BY clauses, and columns in JOIN conditions. Unique constraints automatically create indexes.
 
 ### When NOT to Index
 
@@ -1021,27 +1014,13 @@ WHERE seq_scan > 0
 ORDER BY seq_tup_read DESC;
 ```
 
-### Implementation Checklist
+### Best Practices
 
-- [ ] Add indexes for all foreign keys
-- [ ] Add composite indexes for common query patterns
-- [ ] Use partial indexes to reduce index size
-- [ ] Use GIN indexes for JSONB columns queried with `@>` or `->>`
-- [ ] Create indexes concurrently on production tables
-- [ ] Monitor slow query logs weekly
-- [ ] Review unused indexes quarterly (drop if not needed)
-- [ ] Document index rationale in migration comments
-- [ ] Test query plans with `EXPLAIN ANALYZE` before/after
+Add indexes for all foreign keys and composite indexes for common query patterns. Use partial indexes to reduce index size and GIN indexes for JSONB columns queried with `@>` or `->>`. Create indexes concurrently on production tables. Monitor slow query logs weekly and review unused indexes quarterly (drop if not needed). Document index rationale in migration comments and test query plans with `EXPLAIN ANALYZE` before and after changes.
 
 ## Zero-Downtime Migrations
 
-### Key Principles
-
-- [ ] Never lock tables for extended periods
-- [ ] Add columns as nullable first, backfill, then add constraint
-- [ ] Create indexes concurrently
-- [ ] Avoid renaming columns (add new, migrate, remove old)
-- [ ] Deploy code changes before and after schema changes
+Never lock tables for extended periods. Add columns as nullable first, backfill data, then add the NOT NULL constraint. Create indexes concurrently. Avoid renaming columns—instead add a new column, migrate data, update code, then remove the old column. Deploy code changes both before and after schema changes to handle the transition.
 
 ### Safe Migration Patterns
 
@@ -1053,121 +1032,49 @@ ORDER BY seq_tup_read DESC;
 | Change column type | Add new column, migrate data, swap |
 | Rename column | Add new, copy data, update code, remove old |
 
-### Implementation Checklist
+### Implementation
 
-- [ ] Use `Ecto.Migration.execute/2` for concurrent index creation
-- [ ] Split risky migrations into multiple deployments
-- [ ] Test migrations against production-like data
-- [ ] Have rollback plan for each migration
+Use `Ecto.Migration.execute/2` for concurrent index creation. Split risky migrations into multiple deployments. Test migrations against production-like data and have a rollback plan for each migration.
 
 ## Soft Deletes
 
-Keep deleted records for recovery and audit trails instead of hard deleting.
+Keep deleted records for recovery and audit trails instead of hard deleting. Use a `deleted_at` timestamp column (NULL = active, timestamp = deleted). Default queries should exclude deleted records, making it transparent to most code. Restore by setting `deleted_at` to NULL.
 
-### Key Decisions
+Add `deleted_at` (datetime, nullable) to tables needing soft delete. Create a base query macro that filters `WHERE deleted_at IS NULL`. Use `deleted_at = NOW()` instead of `DELETE`. Create `with_deleted/1` and `only_deleted/1` query helpers for admin and trash views. Add unique indexes with `WHERE deleted_at IS NULL` partial index. Handle cascading soft deletes for related records.
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Column | `deleted_at` timestamp | NULL = active, timestamp = deleted |
-| Queries | Default scope excludes deleted | Transparent to most code |
-| Restoration | Set `deleted_at` to NULL | Simple recovery |
+Use soft deletes for: user accounts (GDPR recovery period), important business records (orders, invoices), content that might be restored (posts, comments), and audit-sensitive data.
 
-### Implementation Checklist
-
-- [ ] Add `deleted_at` (datetime, nullable) to tables needing soft delete
-- [ ] Create base query macro that filters `WHERE deleted_at IS NULL`
-- [ ] Use `deleted_at = NOW()` instead of `DELETE`
-- [ ] Create `with_deleted/1` query helper for admin views
-- [ ] Create `only_deleted/1` query helper for trash views
-- [ ] Add unique indexes with `WHERE deleted_at IS NULL` partial index
-- [ ] Handle cascading soft deletes for related records
-
-### When to Use
-
-- [ ] User accounts (GDPR recovery period)
-- [ ] Important business records (orders, invoices)
-- [ ] Content that might be restored (posts, comments)
-- [ ] Audit-sensitive data
-
-### When NOT to Use
-
-- [ ] High-volume ephemeral data (logs, sessions)
-- [ ] Data that must be truly deleted (PII after retention period)
-- [ ] Join tables / associations (usually hard delete)
+Don't use soft deletes for: high-volume ephemeral data (logs, sessions), data that must be truly deleted (PII after retention period), or join tables/associations (usually hard delete).
 
 ## Data Seeding
 
-Populate database with initial and test data.
+Populate database with initial and test data. Seeds live in `priv/repo/seeds.exs` (Mix convention). Use factories (ex_machina) for test data—they're flexible and composable. Make seeds idempotent by checking before insert so they're safe to run multiple times.
 
-### Key Decisions
+### Production Seeds
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Location | `priv/repo/seeds.exs` | Mix convention |
-| Test data | Factories (ex_machina) | Flexible, composable |
-| Idempotent | Check before insert | Safe to run multiple times |
-
-### Implementation Checklist
-
-### Production Seeds (`seeds.exs`)
-
-- [ ] Create default admin user (if applicable)
-- [ ] Insert static reference data (countries, categories, plans)
-- [ ] Make idempotent (use `insert_or_update` or check existence)
-- [ ] Run via `mix ecto.setup` or release migration
+Create a default admin user if applicable. Insert static reference data (countries, categories, plans). Make seeds idempotent using `insert_or_update` or checking existence. Run via `mix ecto.setup` or release migration.
 
 ### Development Seeds
 
-- [ ] Create realistic sample data for development
-- [ ] Include various user roles and states
-- [ ] Generate enough data to test pagination
-- [ ] Include edge cases (long names, special characters)
+Create realistic sample data for development. Include various user roles and states. Generate enough data to test pagination. Include edge cases like long names and special characters.
 
-### Factories (ex_machina)
+### Factories
 
-- [ ] Define factory for each schema
-- [ ] Use sequences for unique fields (`sequence(:email, &"user#{&1}@test.com")`)
-- [ ] Create traits for common variations (`:admin`, `:with_subscription`)
-- [ ] Build associations lazily
+Define a factory for each schema. Use sequences for unique fields (`sequence(:email, &"user#{&1}@test.com")`). Create traits for common variations (`:admin`, `:with_subscription`). Build associations lazily.
 
-### Best Practices
-
-- [ ] Never seed production with test data
-- [ ] Use environment checks (`if Mix.env() == :dev`)
-- [ ] Document seed data in README
-- [ ] Keep seeds fast (batch inserts)
+Never seed production with test data. Use environment checks (`if Mix.env() == :dev`). Document seed data in README and keep seeds fast with batch inserts.
 
 ## Pagination
 
-Paginate list endpoints for performance and usability.
-
-### Key Decisions
-
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Default style | Cursor-based | Stable for real-time data |
-| Fallback | Offset for simple cases | Easier for static data |
-| Default limit | 20 | Balance between UX and performance |
-| Max limit | 100 | Prevent abuse |
+Paginate list endpoints for performance and usability. Default to cursor-based pagination (stable for real-time data) with offset as fallback for simple cases. Default limit is 20, max is 100 to prevent abuse.
 
 ### Cursor-Based Pagination
 
-Best for: feeds, real-time data, infinite scroll
-
-- [ ] Encode cursor as opaque string (base64 of ID + timestamp)
-- [ ] Use indexed columns for cursor (id, inserted_at)
-- [ ] Return `next_cursor` in response meta
-- [ ] Accept `cursor` and `limit` params
-- [ ] Handle cursor decoding errors gracefully
+Best for feeds, real-time data, and infinite scroll. Encode cursor as an opaque string (base64 of ID + timestamp). Use indexed columns for cursor (id, inserted_at). Return `next_cursor` in response meta. Accept `cursor` and `limit` params. Handle cursor decoding errors gracefully.
 
 ### Offset-Based Pagination
 
-Best for: admin tables, search results, static lists
-
-- [ ] Accept `page` and `per_page` (or `limit`) params
-- [ ] Return total count in response meta
-- [ ] Calculate `total_pages`
-- [ ] Cap offset to prevent deep pagination attacks
+Best for admin tables, search results, and static lists. Accept `page` and `per_page` (or `limit`) params. Return total count in response meta and calculate `total_pages`. Cap offset to prevent deep pagination attacks.
 
 ### Response Format
 
@@ -1184,112 +1091,47 @@ Best for: admin tables, search results, static lists
 }
 ```
 
-### Implementation Checklist
+### Implementation
 
-- [ ] Create Pagination module with helpers
-- [ ] Support both cursor and offset in same codebase
-- [ ] Add `limit` validation (1-100)
-- [ ] Index columns used for sorting/cursors
-- [ ] Return consistent meta object structure
-- [ ] Handle empty results gracefully
+Create a Pagination module with helpers. Support both cursor and offset in the same codebase. Add `limit` validation (1-100). Index columns used for sorting/cursors. Return consistent meta object structure and handle empty results gracefully.
 
-### Frontend
-
-- [ ] Infinite scroll for cursor pagination
-- [ ] Page numbers/prev/next for offset pagination
-- [ ] Loading states during pagination
-- [ ] "Load more" button alternative to infinite scroll
+On the frontend, use infinite scroll for cursor pagination and page numbers/prev/next for offset pagination. Show loading states during pagination. Offer a "Load more" button as an alternative to infinite scroll.
 
 ## Database Transactions (Ecto.Multi)
 
-Compose multiple database operations into atomic transactions.
+Compose multiple database operations into atomic transactions. Ecto.Multi is built-in, composable, and uses named steps. Rollback is automatic on failure (all-or-nothing semantics). Pattern match on result for clear success/failure paths.
 
-### Key Decisions
-
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Tool | Ecto.Multi | Built-in, composable, named steps |
-| Rollback | Automatic on failure | All-or-nothing semantics |
-| Error handling | Pattern match on result | Clear success/failure paths |
-
-### When to Use Ecto.Multi
-
-- [ ] Creating related records together (user + profile + settings)
-- [ ] Operations that must all succeed or all fail
-- [ ] When you need to use results from earlier steps
-- [ ] Complex workflows with multiple database writes
+Use Ecto.Multi when creating related records together (user + profile + settings), when operations must all succeed or all fail, when you need to use results from earlier steps, or for complex workflows with multiple database writes.
 
 ### Implementation Patterns
 
-#### Basic Multi
+Create Multi with `Ecto.Multi.new()`. Add operations with `insert`, `update`, `delete`. Name each step for error identification. Run with `Repo.transaction(multi)`.
 
-- [ ] Create Multi with `Ecto.Multi.new()`
-- [ ] Add operations with `insert`, `update`, `delete`
-- [ ] Name each step for error identification
-- [ ] Run with `Repo.transaction(multi)`
-
-#### Using Previous Results
-
-- [ ] Use `Ecto.Multi.run/3` for dynamic operations
-- [ ] Access previous results via `changes` map
-- [ ] Return `{:ok, result}` or `{:error, reason}`
-
-#### Conditional Operations
-
-- [ ] Use `Multi.run/3` for conditional logic
-- [ ] Check conditions and return early if needed
-- [ ] Can skip operations by returning existing data
+For dynamic operations, use `Ecto.Multi.run/3`. Access previous results via the `changes` map. Return `{:ok, result}` or `{:error, reason}`. For conditional logic, use `Multi.run/3` to check conditions and return early if needed.
 
 ### Error Handling
 
-- [ ] Pattern match: `{:ok, results}` or `{:error, step, reason, changes}`
-- [ ] `step` identifies which operation failed
-- [ ] `changes` contains successful operations before failure
-- [ ] All changes rolled back automatically
+Pattern match the result: `{:ok, results}` or `{:error, step, reason, changes}`. The `step` identifies which operation failed. The `changes` map contains successful operations before failure. All changes are rolled back automatically.
 
 ### Best Practices
 
-- [ ] Keep transactions short (avoid external calls inside)
-- [ ] Name steps descriptively (`:create_user`, `:send_welcome_email`)
-- [ ] Don't put side effects inside transactions (emails, webhooks)
-- [ ] Use `Multi.run/3` for complex validations
-- [ ] Consider optimistic locking for concurrent updates
+Keep transactions short—avoid external calls inside. Name steps descriptively (`:create_user`, `:send_welcome_email`). Don't put side effects inside transactions (emails, webhooks should happen after). Use `Multi.run/3` for complex validations. Consider optimistic locking for concurrent updates.
 
 ### Common Patterns
 
-- [ ] User registration: create user, profile, send verification email (email outside transaction)
-- [ ] Order placement: create order, create line items, update inventory
-- [ ] Team creation: create team, add creator as admin member
+Common uses: user registration (create user, profile, send verification email—email outside transaction), order placement (create order, create line items, update inventory), and team creation (create team, add creator as admin member).
 
 ---
 
 # Multi-Tenancy
 
-Isolate customer data from day 1. Add `org_id` to all transactional tables.
+Isolate customer data from day 1. Add `org_id` to all transactional tables. Use row-level isolation with `org_id` (simpler, sufficient for most SaaS). Extract org_id from JWT claims and enforce via query scoping.
 
-## Key Decisions
-
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Strategy | Row-level with org_id | Simpler, sufficient for most SaaS |
-| Column name | `org_id` or `organization_id` | Consistent across all tables |
-| Identification | JWT claim + header | Extracted from auth token |
-| Enforcement | Query scoping | All queries filter by org_id |
-
-## Why Row-Level (Not Schema-Per-Tenant)
-
-| Aspect | Row-Level | Schema-Per-Tenant |
-|--------|-----------|-------------------|
-| Complexity | Low | High |
-| Migrations | Single migration | Per-tenant migrations |
-| Connection pooling | Standard | Complex (schema switching) |
-| Cross-tenant queries | Easy (admin) | Requires schema hopping |
-| Data isolation | Application-enforced | Database-enforced |
-| Best for | Most SaaS apps | Strict compliance needs |
+Row-level is preferred over schema-per-tenant because it has lower complexity, single migration path, standard connection pooling, and easy cross-tenant queries for admin. Schema-per-tenant provides database-enforced isolation but is only needed for strict compliance requirements.
 
 ## Database Schema
 
-Every transactional table includes:
+Every transactional table includes `org_id`:
 
 ```sql
 CREATE TABLE products (
@@ -1304,15 +1146,9 @@ CREATE TABLE products (
 CREATE INDEX idx_products_org_id ON products(org_id);
 ```
 
-## Implementation Checklist
+## Implementation
 
-### Organization Schema
-
-- [ ] Create `organizations` table (id, name, slug, settings, created_at)
-- [ ] Add unique index on `slug`
-- [ ] Create Organization Ecto schema
-- [ ] Add `org_id` foreign key to ALL transactional tables
-- [ ] Index `org_id` on all tables for query performance
+Create an `organizations` table (id, name, slug, settings, created_at) with a unique index on `slug`. Add `org_id` foreign key to ALL transactional tables and index `org_id` on all tables for query performance.
 
 ### Query Scoping
 
@@ -1329,10 +1165,7 @@ def get_product!(org_id, id) do
 end
 ```
 
-- [ ] All context functions take `org_id` as first parameter
-- [ ] Never query tenant data without org_id filter
-- [ ] Create base query helpers that enforce scoping
-- [ ] Audit existing queries for missing org_id filters
+All context functions take `org_id` as first parameter. Never query tenant data without org_id filter. Create base query helpers that enforce scoping. Audit existing queries for missing org_id filters.
 
 ### Request Context
 
@@ -1352,64 +1185,31 @@ defmodule MyAppWeb.Plugs.SetOrgContext do
 end
 ```
 
-- [ ] Extract org_id from JWT claims
-- [ ] Store in `conn.assigns.current_org_id`
-- [ ] Pass to all context functions
-- [ ] Log org_id in structured logs
+Extract org_id from JWT claims. Store in `conn.assigns.current_org_id`. Pass to all context functions. Log org_id in structured logs.
 
 ### Data Isolation Verification
 
-- [ ] Write tests that verify cross-tenant data cannot be accessed
-- [ ] Test that user from org A cannot see org B's data
-- [ ] Add CI check for queries missing org_id filter
-- [ ] Regular audit of data access patterns
+Write tests that verify cross-tenant data cannot be accessed. Test that user from org A cannot see org B's data. Add CI check for queries missing org_id filter. Perform regular audits of data access patterns.
 
-### Admin/Super-Admin Access
+### Admin Access
 
-- [ ] Admin endpoints can query across orgs (with audit logging)
-- [ ] Use separate admin authentication
-- [ ] Log all cross-tenant access
-- [ ] Implement org impersonation for support
+Admin endpoints can query across orgs (with audit logging). Use separate admin authentication. Log all cross-tenant access. Implement org impersonation for support.
 
 ---
 
 # Environment Configuration
 
-## Key Decisions
+Use environment variables for configuration (12-factor app). Keep secrets in an external secret manager—never in code or repo. Validate at runtime to fail fast on missing config.
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Config method | Environment variables | 12-factor app |
-| Secrets | External secret manager | Never in code/repo |
-| Validation | Runtime config | Fail fast on missing config |
-
-## Implementation Checklist
-
-- [ ] Use `config/runtime.exs` for environment-specific config
-- [ ] Validate required environment variables on startup
-- [ ] Provide sensible defaults for development
-- [ ] Document all environment variables
-- [ ] Use `.env.example` as template
+Use `config/runtime.exs` for environment-specific config. Validate required environment variables on startup. Provide sensible defaults for development. Document all environment variables. Use `.env.example` as a template.
 
 ---
 
 # Secrets Management
 
-## Key Decisions
+Store secrets in AWS Secrets Manager, Vault, or Doppler (centralized, audited). Automate rotation where possible to reduce exposure. Use service-specific credentials (least privilege).
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Storage | AWS Secrets Manager / Vault / Doppler | Centralized, audited |
-| Rotation | Automated where possible | Reduce exposure |
-| Access | Service-specific credentials | Least privilege |
-
-## Implementation Checklist
-
-- [ ] Never commit secrets to repository
-- [ ] Use secret manager for production
-- [ ] Rotate secrets regularly
-- [ ] Audit secret access
-- [ ] Use different secrets per environment
+Never commit secrets to repository. Use secret manager for production. Rotate secrets regularly. Audit secret access. Use different secrets per environment.
 
 ---
 
@@ -1576,18 +1376,9 @@ end
 Logger.info("User updated", user: LogSanitizer.sanitize(user_params))
 ```
 
-### Implementation Checklist
+### Implementation
 
-- [ ] Configure JSON log formatter
-- [ ] Include `request_id` in all logs
-- [ ] Include `user_id` and `org_id` when available
-- [ ] Set appropriate log levels per environment
-- [ ] Set up Promtail or Vector for log shipping
-- [ ] Configure Grafana Loki datasource
-- [ ] Create Grafana dashboards for log analysis
-- [ ] Implement PII redaction for sensitive fields
-- [ ] Set up alerts for error rate spikes
-- [ ] Configure log retention policy in Loki
+Configure JSON log formatter. Include `request_id` in all logs. Include `user_id` and `org_id` when available. Set appropriate log levels per environment. Set up Promtail or Vector for log shipping. Configure Grafana Loki datasource. Create Grafana dashboards for log analysis. Implement PII redaction for sensitive fields. Set up alerts for error rate spikes. Configure log retention policy in Loki.
 
 ### Log Levels by Environment
 
@@ -1600,148 +1391,65 @@ Logger.info("User updated", user: LogSanitizer.sanitize(user_params))
 
 ### Metrics
 
-- [ ] Instrument request latency and throughput
-- [ ] Track error rates
-- [ ] Monitor background job queues
-- [ ] Create dashboards for key metrics
+Instrument request latency and throughput. Track error rates. Monitor background job queues. Create dashboards for key metrics.
 
 ### Tracing
 
-- [ ] Add OpenTelemetry instrumentation
-- [ ] Trace requests across services
-- [ ] Include span attributes for debugging
+Add OpenTelemetry instrumentation. Trace requests across services. Include span attributes for debugging.
 
 ### Error Tracking
 
-- [ ] Configure Sentry with source maps
-- [ ] Add user context to errors
-- [ ] Set up alerts for new errors
+Configure Sentry with source maps. Add user context to errors. Set up alerts for new errors.
 
 ---
 
 # Request ID / Correlation ID
 
-Trace requests across your entire system for debugging and observability.
+Trace requests across your entire system for debugging and observability. Use `X-Request-ID` header (industry standard) with UUID v4 format. Accept client-provided IDs or generate if missing. Propagate to all services for end-to-end tracing.
 
-## Key Decisions
+## Backend (Phoenix)
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Header | `X-Request-ID` | Industry standard |
-| Format | UUID v4 | Unique, no collisions |
-| Generation | Accept or generate | Honor client IDs, generate if missing |
-| Propagation | All services | End-to-end tracing |
+Create a RequestId plug that checks for existing `X-Request-ID` header and generates UUID if not present. Store in `conn.assigns` and Logger metadata. Return in response headers. Include in all log entries.
 
-## Implementation Checklist
+Configure Logger with `$metadata` including request_id. Use `Logger.metadata(request_id: id)` in the plug. All subsequent logs automatically include the ID. Include in error reports (Sentry).
 
-### Backend (Phoenix)
+## External Service Calls
 
-- [ ] Create RequestId plug
-- [ ] Check for existing `X-Request-ID` header
-- [ ] Generate UUID if not present
-- [ ] Store in `conn.assigns` and Logger metadata
-- [ ] Return in response headers
-- [ ] Include in all log entries
+Pass `X-Request-ID` to downstream services in HTTP client headers. Pass to background jobs via Oban job args. Include in webhook payloads.
 
-### Logger Integration
+## Background Jobs
 
-- [ ] Configure Logger with `$metadata` including request_id
-- [ ] Use `Logger.metadata(request_id: id)` in plug
-- [ ] All subsequent logs automatically include ID
-- [ ] Include in error reports (Sentry)
+Accept request_id in job args. Set Logger metadata at job start to trace job back to originating request.
 
-### External Service Calls
+## Frontend
 
-- [ ] Pass `X-Request-ID` to downstream services
-- [ ] Include in HTTP client headers
-- [ ] Pass to background jobs (Oban job args)
-- [ ] Include in webhook payloads
+Generate request ID for user-initiated actions. Include in API request headers. Display in error messages ("Error ID: xxx") to help support locate issues quickly.
 
-### Background Jobs
-
-- [ ] Accept request_id in job args
-- [ ] Set Logger metadata at job start
-- [ ] Trace job back to originating request
-
-### Frontend
-
-- [ ] Generate request ID for user-initiated actions
-- [ ] Include in API request headers
-- [ ] Display in error messages ("Error ID: xxx")
-- [ ] Help support locate issues quickly
-
-### Response Headers
-
-- [ ] Always return `X-Request-ID` in responses
-- [ ] Client can reference ID when reporting issues
-- [ ] Useful for debugging API integrations
+Always return `X-Request-ID` in responses so clients can reference it when reporting issues.
 
 ---
 
 # Circuit Breakers
 
-Protect your application from cascading failures when external services are down.
-
-## Key Decisions
-
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Library | `fuse` | Battle-tested Erlang library |
-| Strategy | Per-service breaker | Isolate failures |
-| States | Closed, Open, Half-Open | Standard circuit breaker pattern |
+Protect your application from cascading failures when external services are down. Use `fuse` (battle-tested Erlang library) with per-service breakers to isolate failures.
 
 ## Circuit Breaker States
 
-- **Closed**: Normal operation, requests pass through
-- **Open**: Service is down, fail fast without calling
-- **Half-Open**: Test if service recovered with limited requests
+**Closed**: Normal operation, requests pass through. **Open**: Service is down, fail fast without calling. **Half-Open**: Test if service recovered with limited requests.
 
-## Implementation Checklist
+## Implementation
 
-### Fuse Configuration
+Add `fuse` to dependencies. Define a fuse per external service. Configure failure threshold (e.g., 5 failures) and reset timeout (e.g., 30 seconds). Start fuses in application supervision tree.
 
-- [ ] Add `fuse` to dependencies
-- [ ] Define fuse per external service
-- [ ] Configure failure threshold (e.g., 5 failures)
-- [ ] Configure reset timeout (e.g., 30 seconds)
-- [ ] Start fuses in application supervision tree
+When making external calls: check fuse state first. If open, return error immediately (fail fast). If closed, make the call. On success, reset failure count. On failure, record failure (may trip breaker).
 
-### Wrapping External Calls
+Create a wrapper module for external APIs that includes circuit breaker check. Handle timeouts and connection errors as failures.
 
-- [ ] Check fuse state before calling
-- [ ] If open, return error immediately (fail fast)
-- [ ] If closed, make the call
-- [ ] On success, reset failure count
-- [ ] On failure, record failure (may trip breaker)
+Protect: payment providers (Stripe), email services (SendGrid, Postmark), SMS providers (Twilio), third-party APIs, and internal microservices.
 
-### HTTP Client Integration
+Fallback strategies: return cached data if available, return degraded response, queue for retry (if idempotent), or show user-friendly error message.
 
-- [ ] Create wrapper module for external APIs
-- [ ] Include circuit breaker check
-- [ ] Handle timeouts as failures
-- [ ] Handle connection errors as failures
-
-### Services to Protect
-
-- [ ] Payment providers (Stripe)
-- [ ] Email services (SendGrid, Postmark)
-- [ ] SMS providers (Twilio)
-- [ ] Third-party APIs
-- [ ] Internal microservices
-
-### Fallback Strategies
-
-- [ ] Return cached data if available
-- [ ] Return degraded response
-- [ ] Queue for retry (if idempotent)
-- [ ] Show user-friendly error message
-
-### Monitoring
-
-- [ ] Log circuit breaker state changes
-- [ ] Alert when circuit opens
-- [ ] Track time in open state
-- [ ] Dashboard showing breaker status
+Log circuit breaker state changes. Alert when circuit opens. Track time in open state. Create dashboard showing breaker status.
 
 ### Configuration per Service
 
@@ -1755,66 +1463,21 @@ Protect your application from cascading failures when external services are down
 
 # Retry Logic & Timeouts
 
-Handle transient failures gracefully with retries and prevent hanging requests with timeouts.
-
-## Key Decisions
-
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| HTTP client | Req / Finch | Modern, configurable |
-| Retry strategy | Exponential backoff | Avoid thundering herd |
-| Max retries | 3 | Balance reliability vs. latency |
-| Jitter | Random | Spread retry storms |
+Handle transient failures gracefully with retries and prevent hanging requests with timeouts. Use Req or Finch for HTTP clients. Use exponential backoff with random jitter to avoid thundering herd and spread retry storms. Max 3 retries balances reliability vs. latency.
 
 ## Timeout Configuration
 
-### HTTP Client Timeouts
+HTTP client timeouts: connect 5s, receive 30s, pool 5s. Database timeouts: query 15 seconds (Ecto `:timeout` option), queue 5 seconds (waiting for connection). Use shorter timeouts for user-facing requests; longer timeouts are OK for background jobs.
 
-| Timeout | Value | Purpose |
-|---------|-------|---------|
-| Connect | 5s | Time to establish connection |
-| Receive | 30s | Time to receive response |
-| Pool | 5s | Time to get connection from pool |
-
-### Database Timeouts
-
-- [ ] Query timeout: 15 seconds (Ecto `:timeout` option)
-- [ ] Queue timeout: 5 seconds (waiting for connection)
-- [ ] Use shorter timeouts for user-facing requests
-- [ ] Longer timeouts OK for background jobs
-
-### Background Job Timeouts
-
-- [ ] Set Oban job timeout per worker
-- [ ] Default: 60 seconds
-- [ ] Long-running jobs: up to 30 minutes
-- [ ] Always have a timeout (never infinite)
+For Oban jobs, set timeout per worker. Default 60 seconds, long-running jobs up to 30 minutes. Always have a timeout (never infinite).
 
 ## Retry Implementation
 
-### What to Retry
+Retry network errors (connection refused, timeout), 5xx server errors (503, 502, 500), and 429 Too Many Requests (respecting Retry-After header). Do NOT retry 4xx client errors or business logic failures.
 
-- [ ] Network errors (connection refused, timeout)
-- [ ] 5xx server errors (503, 502, 500)
-- [ ] 429 Too Many Requests (with Retry-After header)
-- [ ] DO NOT retry: 4xx client errors, business logic failures
+Use exponential backoff: base delay 100ms, multiplier 2x each attempt, max delay cap 30 seconds, with random jitter (0-25% of delay). Sequence: 100ms, 200ms, 400ms, 800ms...
 
-### Exponential Backoff
-
-- [ ] Base delay: 100ms
-- [ ] Multiplier: 2x each attempt
-- [ ] Max delay cap: 30 seconds
-- [ ] Add random jitter (0-25% of delay)
-- [ ] Sequence: 100ms, 200ms, 400ms, 800ms...
-
-### Implementation Checklist
-
-- [ ] Create HTTP client wrapper with retry logic
-- [ ] Configure timeouts on all HTTP clients
-- [ ] Respect `Retry-After` header from APIs
-- [ ] Log retry attempts with context
-- [ ] Track retry metrics (success after N retries)
-- [ ] Set circuit breaker integration (don't retry if open)
+Create HTTP client wrapper with retry logic. Configure timeouts on all HTTP clients. Respect `Retry-After` header from APIs. Log retry attempts with context. Track retry metrics (success after N retries). Integrate with circuit breaker (don't retry if open).
 
 ### Per-Service Configuration
 
@@ -1825,58 +1488,27 @@ Handle transient failures gracefully with retries and prevent hanging requests w
 | Webhooks | 0 | - | Handled by delivery system |
 | Analytics | 1 | 100ms | Non-critical, fail fast |
 
-### Idempotency
+Only retry idempotent operations. Use idempotency keys for non-idempotent APIs. GET/HEAD/OPTIONS are always safe to retry; POST requests need careful evaluation.
 
-- [ ] Only retry idempotent operations
-- [ ] Use idempotency keys for non-idempotent APIs
-- [ ] POST requests: check if safe to retry
-- [ ] GET/HEAD/OPTIONS: always safe to retry
-
-### Monitoring
-
-- [ ] Track timeout occurrences
-- [ ] Track retry success rates
-- [ ] Alert on elevated timeout/retry rates
-- [ ] Log external service latency
+Track timeout occurrences and retry success rates. Alert on elevated timeout/retry rates. Log external service latency.
 
 ---
 
 # Health Checks
 
-Expose endpoints for load balancers, orchestrators, and monitoring systems to verify application health.
+Expose endpoints for load balancers, orchestrators, and monitoring systems to verify application health. Use `/health` for liveness (simple ping—"Is the process running?") and `/ready` for readiness (dependency checks—"Can it handle traffic?").
 
-## Key Decisions
+## Liveness Check (`/health`)
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Endpoint | `/health` and `/ready` | Industry convention |
-| Liveness | Simple ping | "Is the process running?" |
-| Readiness | Dependency checks | "Can it handle traffic?" |
+Return 200 if process is running. No dependency checks (avoid false negatives). Fast response (under 100ms). Used by process supervisors and basic monitoring.
 
-## Implementation Checklist
+## Readiness Check (`/ready`)
 
-### Liveness Check (`/health` or `/healthz`)
+Check database connectivity, Redis connectivity, and critical external services. Return 200 only if all checks pass. Return 503 with details if any check fails. Used by load balancers and monitoring systems.
 
-- [ ] Return 200 if process is running
-- [ ] No dependency checks (avoid false negatives)
-- [ ] Fast response (under 100ms)
-- [ ] Used by: process supervisors, basic monitoring
+## Deep Health Check (`/health/detailed`)
 
-### Readiness Check (`/ready` or `/readyz`)
-
-- [ ] Check database connectivity
-- [ ] Check Redis connectivity
-- [ ] Check critical external services
-- [ ] Return 200 only if all checks pass
-- [ ] Return 503 with details if any check fails
-- [ ] Used by: load balancers, monitoring systems
-
-### Deep Health Check (`/health/detailed`) - Optional
-
-- [ ] Return status of all dependencies
-- [ ] Include version information
-- [ ] Include uptime
-- [ ] Protect with authentication (sensitive info)
+Optional endpoint that returns status of all dependencies, version information, and uptime. Protect with authentication since it contains sensitive info.
 
 ### Response Format
 
@@ -1891,60 +1523,33 @@ Expose endpoints for load balancers, orchestrators, and monitoring systems to ve
 }
 ```
 
-### Implementation
-
-- [ ] Create HealthController with check endpoints
-- [ ] Add routes outside authentication middleware
-- [ ] Set appropriate timeouts for dependency checks
-- [ ] Cache check results briefly (avoid hammering dependencies)
+Create HealthController with check endpoints. Add routes outside authentication middleware. Set appropriate timeouts for dependency checks. Cache check results briefly to avoid hammering dependencies.
 
 ---
 
 # Graceful Shutdown
 
-Handle termination signals properly to avoid dropped requests and data loss.
+Handle termination signals properly to avoid dropped requests and data loss. On SIGTERM, stop accepting new connections, drain for 30 seconds to allow in-flight requests to complete, then terminate.
 
-## Key Decisions
+## Phoenix Endpoint
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Signal | SIGTERM | Standard termination signal |
-| Drain period | 30 seconds | Allow in-flight requests to complete |
-| Order | Stop accepting, drain, terminate | Clean shutdown |
+Configure `draining_timeout` in endpoint config. Stop accepting new connections on SIGTERM. Wait for in-flight requests to complete. Return 503 for new requests during drain.
 
-## Implementation Checklist
+## Background Jobs (Oban)
 
-### Phoenix Endpoint
+Configure graceful shutdown in Oban config. Allow running jobs to complete. Don't start new jobs during shutdown. Set reasonable job timeout (shorter than drain period).
 
-- [ ] Configure `draining_timeout` in endpoint config
-- [ ] Stop accepting new connections on SIGTERM
-- [ ] Wait for in-flight requests to complete
-- [ ] Return 503 for new requests during drain
+## WebSocket Connections
 
-### Background Jobs (Oban)
+Notify connected clients of impending shutdown. Allow clients to reconnect to another instance. Close connections after notification.
 
-- [ ] Configure graceful shutdown in Oban config
-- [ ] Allow running jobs to complete
-- [ ] Don't start new jobs during shutdown
-- [ ] Set reasonable job timeout (shorter than drain period)
+## Database Connections
 
-### WebSocket Connections
+Return connections to pool. Wait for transactions to complete. Close pool connections cleanly.
 
-- [ ] Notify connected clients of impending shutdown
-- [ ] Allow clients to reconnect to another instance
-- [ ] Close connections after notification
+## systemd Integration
 
-### Database Connections
-
-- [ ] Return connections to pool
-- [ ] Wait for transactions to complete
-- [ ] Close pool connections cleanly
-
-### systemd Integration
-
-- [ ] Configure `TimeoutStopSec` >= drain period
-- [ ] Use `ExecStop` for graceful shutdown script if needed
-- [ ] Remove from load balancer before stopping service
+Configure `TimeoutStopSec` >= drain period. Use `ExecStop` for graceful shutdown script if needed. Remove from load balancer before stopping service.
 
 ---
 
