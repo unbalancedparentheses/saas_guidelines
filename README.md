@@ -1555,124 +1555,43 @@ Configure `TimeoutStopSec` >= drain period. Use `ExecStop` for graceful shutdown
 
 # Error Pages
 
-Custom error pages for better user experience when things go wrong.
+Custom error pages improve user experience when things go wrong. Match app design for consistent experience. Use helpful, non-technical information with clear next steps to reduce frustration.
 
-## Key Decisions
+Create pages for: 404 Not Found ("Page doesn't exist"), 403 Forbidden ("You don't have access"), 500 Internal Error ("Something went wrong"), 503 Service Unavailable ("Maintenance mode"), and an offline page for PWA.
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Style | Match app design | Consistent experience |
-| Information | Helpful, not technical | User-friendly |
-| Actions | Clear next steps | Reduce frustration |
+Use friendly, non-technical language. Suggest actions (go home, search, contact support). Include branding (logo, colors). Never expose stack traces to users—log errors server-side for debugging.
 
-## Implementation Checklist
-
-### Error Pages to Create
-
-- [ ] 404 Not Found - "Page doesn't exist"
-- [ ] 403 Forbidden - "You don't have access"
-- [ ] 500 Internal Error - "Something went wrong"
-- [ ] 503 Service Unavailable - "Maintenance mode"
-- [ ] Offline page (for PWA)
-
-### Content Guidelines
-
-- [ ] Friendly, non-technical language
-- [ ] Suggest actions (go home, search, contact support)
-- [ ] Include branding (logo, colors)
-- [ ] Don't expose stack traces to users
-- [ ] Log errors server-side for debugging
-
-### Implementation
-
-- [ ] Phoenix API returns structured JSON errors
-- [ ] React ErrorBoundary for component errors
-- [ ] React error page components (404, 500, etc.)
-- [ ] API client error interceptor
-- [ ] Test error handling end-to-end
+Phoenix API returns structured JSON errors. React uses ErrorBoundary for component errors and error page components (404, 500, etc.). API client has error interceptor. Test error handling end-to-end.
 
 ---
 
 # Terms of Service Tracking
 
-Track user acceptance of terms of service and privacy policy for legal compliance.
+Track user acceptance of terms of service and privacy policy for legal compliance. Store in separate table for audit trail and multiple versions. Use date-based or semantic versioning. Require re-acceptance on major changes.
 
-## Key Decisions
+## Database Schema
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Storage | Separate table | Audit trail, multiple versions |
-| Versioning | Date-based or semantic | Track policy changes |
-| Re-acceptance | Required on major changes | Legal compliance |
+The `terms_acceptances` table stores: `user_id` (who accepted), `document_type` ("terms_of_service" or "privacy_policy"), `version` (version accepted), `accepted_at` (when), `ip_address` and `user_agent` (for audit).
 
-## Database Schema (terms_acceptances table)
+## Implementation
 
-- `user_id` (foreign key) - User who accepted
-- `document_type` (string) - "terms_of_service", "privacy_policy"
-- `version` (string) - Version accepted
-- `accepted_at` (datetime) - When accepted
-- `ip_address` (string) - For audit
-- `user_agent` (string) - For audit
+Create TermsAcceptance schema. Store current version in config. Check acceptance on login/signup. Require re-acceptance on version change. Log all acceptances with context.
 
-## Implementation Checklist
+API endpoints: `GET /api/terms/status` (check if user needs to accept), `POST /api/terms/accept` (record acceptance), `GET /api/terms/current` (get current version info).
 
-### Backend
+Frontend: show terms acceptance checkbox on signup, display acceptance modal when new version required, block access until accepted (for major changes), link to full terms document.
 
-- [ ] Create TermsAcceptance schema
-- [ ] Store current version in config
-- [ ] Check acceptance on login/signup
-- [ ] Require re-acceptance on version change
-- [ ] Log all acceptances with context
-
-### API Endpoints
-
-- [ ] `GET /api/terms/status` - Check if user needs to accept
-- [ ] `POST /api/terms/accept` - Record acceptance
-- [ ] `GET /api/terms/current` - Get current version info
-
-### Frontend
-
-- [ ] Show terms acceptance checkbox on signup
-- [ ] Display acceptance modal when new version required
-- [ ] Block access until accepted (for major changes)
-- [ ] Link to full terms document
-
-### Compliance
-
-- [ ] Keep history of all policy versions
-- [ ] Never delete acceptance records
-- [ ] Export acceptance history on data request
+Keep history of all policy versions. Never delete acceptance records. Export acceptance history on data request (GDPR).
 
 ---
 
 # Monitoring & Alerts
 
-## Key Decisions
+Use Prometheus for metrics (industry standard), Grafana for dashboards, and PagerDuty/Opsgenie for incident management.
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Metrics | Prometheus | Industry standard |
-| Dashboards | Grafana | Powerful, flexible |
-| Alerts | PagerDuty / Opsgenie | Incident management |
+Track: request latency (p50, p95, p99), error rates (4xx, 5xx), database query times, background job queue depth, cache hit rates, and external API latencies.
 
-## Implementation Checklist
-
-### Metrics to Track
-
-- [ ] Request latency (p50, p95, p99)
-- [ ] Error rates (4xx, 5xx)
-- [ ] Database query times
-- [ ] Background job queue depth
-- [ ] Cache hit rates
-- [ ] External API latencies
-
-### Dashboards
-
-- [ ] Overview dashboard (key health metrics)
-- [ ] API performance dashboard
-- [ ] Database dashboard
-- [ ] Background jobs dashboard
-- [ ] Business metrics dashboard
+Create dashboards for: overview (key health metrics), API performance, database, background jobs, and business metrics.
 
 ### Alerts to Configure
 
@@ -1689,106 +1608,51 @@ Track user acceptance of terms of service and privacy policy for legal complianc
 
 # Deployment
 
-## Key Decisions
+Deploy to bare metal with NixOS for full control, cost-effectiveness, and reproducibility. Use rolling deployment for zero downtime. Build with Nix flakes for reproducible, cacheable builds. Store secrets with agenix or sops-nix (encrypted in git). Use Caddy or nginx for TLS termination and load balancing.
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Platform | Bare metal with NixOS | Full control, cost-effective, reproducible |
-| Strategy | Rolling deployment | Zero downtime |
-| Build | Nix flake | Reproducible, cacheable builds |
-| Secrets | agenix or sops-nix | Encrypted secrets in git |
-| Reverse proxy | Caddy or nginx | TLS termination, load balancing |
+## Server Setup (NixOS)
 
-## Implementation Checklist
+Install NixOS on bare metal servers. Configure flake-based system configuration. Set up SSH access with keys only. Configure firewall (only 22, 80, 443). Set up automatic security updates. Configure swap and kernel parameters for BEAM.
 
-### Server Setup (NixOS)
+## Elixir Releases
 
-- [ ] Install NixOS on bare metal servers
-- [ ] Configure flake-based system configuration
-- [ ] Set up SSH access with keys only
-- [ ] Configure firewall (only 22, 80, 443)
-- [ ] Set up automatic security updates
-- [ ] Configure swap and kernel parameters for BEAM
+Configure `mix release` for production with runtime configuration (`config/runtime.exs`). Include migrations in release. Set up release health check script. Configure for clustering if needed (libcluster). Build release via Nix for reproducibility.
 
-### Elixir Releases
+## NixOS Application Module
 
-- [ ] Configure `mix release` for production
-- [ ] Use runtime configuration (`config/runtime.exs`)
-- [ ] Include migrations in release
-- [ ] Set up release health check script
-- [ ] Configure for clustering if needed (libcluster)
-- [ ] Build release via Nix for reproducibility
+Create NixOS module for the Phoenix app. Define systemd service with proper user. Configure environment variables. Set up automatic restarts on failure. Configure resource limits (memory, file descriptors). Enable systemd watchdog integration.
 
-### NixOS Application Module
+## Secrets Management
 
-- [ ] Create NixOS module for the Phoenix app
-- [ ] Define systemd service with proper user
-- [ ] Configure environment variables
-- [ ] Set up automatic restarts on failure
-- [ ] Configure resource limits (memory, file descriptors)
-- [ ] Enable systemd watchdog integration
+Use agenix or sops-nix for secrets. Encrypt secrets in git repository. Configure age keys per server. Include DATABASE_URL, SECRET_KEY_BASE, and API keys. Rotate secrets periodically.
 
-### Secrets Management
+## Reverse Proxy (Caddy)
 
-- [ ] Use agenix or sops-nix for secrets
-- [ ] Encrypt secrets in git repository
-- [ ] Configure age keys per server
-- [ ] Include DATABASE_URL, SECRET_KEY_BASE, API keys
-- [ ] Rotate secrets periodically
+Configure Caddy via NixOS module. Automatic HTTPS with Let's Encrypt. WebSocket proxy for Phoenix Channels. Configure rate limiting at proxy level. Set security headers.
 
-### Reverse Proxy (Caddy)
+## Database (PostgreSQL)
 
-- [ ] Configure Caddy via NixOS module
-- [ ] Automatic HTTPS with Let's Encrypt
-- [ ] WebSocket proxy for Phoenix Channels
-- [ ] Configure rate limiting at proxy level
-- [ ] Set security headers
+Run PostgreSQL on dedicated server or same host. Configure via NixOS module. Set up automated backups (pgBackRest or pg_dump). Configure connection limits and memory. Enable SSL for connections.
 
-### Database (PostgreSQL)
+## Deployment Process
 
-- [ ] Run PostgreSQL on dedicated server or same host
-- [ ] Configure via NixOS module
-- [ ] Set up automated backups (pgBackRest or pg_dump)
-- [ ] Configure connection limits and memory
-- [ ] Enable SSL for connections
+Use deploy-rs or nixos-rebuild switch. Deploy from CI or local machine. Run migrations before switching. Health check before marking deploy complete. Automatic rollback on failure.
 
-### Deployment Process
+## CI/CD Pipeline
 
-- [ ] Use deploy-rs or nixos-rebuild switch
-- [ ] Deploy from CI or local machine
-- [ ] Run migrations before switching
-- [ ] Health check before marking deploy complete
-- [ ] Automatic rollback on failure
+Run tests on every push. Build Nix derivation on merge to main. Push to Nix binary cache (Cachix). Deploy to staging automatically. Manual promotion to production. Tag releases in git.
 
-### CI/CD Pipeline
+## High Availability (Optional)
 
-- [ ] Run tests on every push
-- [ ] Build Nix derivation on merge to main
-- [ ] Push to Nix binary cache (Cachix)
-- [ ] Deploy to staging automatically
-- [ ] Manual promotion to production
-- [ ] Tag releases in git
-
-### High Availability (Optional)
-
-- [ ] Multiple app servers behind load balancer
-- [ ] PostgreSQL replication (primary + replica)
-- [ ] Redis replication or Redis Cluster
-- [ ] Distributed Erlang clustering
-- [ ] Health checks remove unhealthy nodes
+Multiple app servers behind load balancer. PostgreSQL replication (primary + replica). Redis replication or Redis Cluster. Distributed Erlang clustering. Health checks remove unhealthy nodes.
 
 ---
 
 # Disaster Recovery
 
-## RTO and RPO Definitions
+**RTO** (Recovery Time Objective) is max acceptable downtime ("Back online within 4 hours"). **RPO** (Recovery Point Objective) is max acceptable data loss ("Lose at most 1 hour of data").
 
-| Metric | Definition | Example |
-|--------|------------|---------|
-| **RTO** (Recovery Time Objective) | Max acceptable downtime | "Back online within 4 hours" |
-| **RPO** (Recovery Point Objective) | Max acceptable data loss | "Lose at most 1 hour of data" |
-
-### Setting RTO/RPO by Tier
+### RTO/RPO by Data Tier
 
 | Data Tier | RPO | RTO | Backup Strategy |
 |-----------|-----|-----|-----------------|
@@ -1797,181 +1661,61 @@ Track user acceptance of terms of service and privacy policy for legal complianc
 | Standard (logs, analytics) | 24 hours | 24 hours | Daily backups |
 | Disposable (cache, sessions) | N/A | N/A | No backup needed |
 
-### Implementation Checklist
-
-- [ ] Classify all data by criticality tier
-- [ ] Document RTO/RPO for each tier
-- [ ] Communicate targets to stakeholders
-- [ ] Test that backups meet RPO targets
-- [ ] Test that recovery meets RTO targets
-- [ ] Review and update quarterly
+Classify all data by criticality tier. Document RTO/RPO for each tier. Communicate targets to stakeholders. Test that backups meet RPO targets and recovery meets RTO targets. Review and update quarterly.
 
 ## Backup Strategy
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Full backup | Daily at 03:00 UTC | Low traffic window |
-| Incremental | Hourly | Balance storage vs. RPO |
-| WAL archiving | Continuous | Point-in-time recovery |
-| Retention | 30 days | Compliance, recovery options |
-| Storage | Separate region | Survive regional outages |
+Full backup daily at 03:00 UTC (low traffic window). Incremental hourly (balance storage vs. RPO). Continuous WAL archiving for point-in-time recovery. 30 days retention for compliance and recovery options. Store in separate region to survive regional outages.
 
 ## Backup Restoration Testing
 
 **CRITICAL**: Untested backups are not backups. Schedule regular restoration drills.
 
-### Monthly Restoration Drill
+Monthly: restore latest backup to isolated environment, verify data integrity (row counts, checksums), test application functionality, measure actual restoration time (compare to RTO), document issues, update runbooks.
 
-- [ ] Restore latest backup to isolated environment
-- [ ] Verify data integrity (row counts, checksums)
-- [ ] Test application functionality against restored data
-- [ ] Measure actual restoration time (compare to RTO)
-- [ ] Document any issues found
-- [ ] Update runbooks based on learnings
+Quarterly: simulate complete infrastructure failure, restore from backups to new infrastructure, measure total recovery time, test failover procedures, report results to stakeholders.
 
-### Restoration Test Checklist
-
-```bash
-# 1. Restore to test environment
-pg_restore -h test-db -d myapp_restore latest_backup.dump
-
-# 2. Verify row counts match production
-psql -c "SELECT 'users', COUNT(*) FROM users UNION ALL
-         SELECT 'orders', COUNT(*) FROM orders;"
-
-# 3. Run application health checks
-curl https://test-restored.myapp.com/health
-
-# 4. Verify critical queries work
-psql -c "SELECT * FROM orders WHERE created_at > NOW() - INTERVAL '1 day';"
-```
-
-### Quarterly Full DR Drill
-
-- [ ] Simulate complete infrastructure failure
-- [ ] Restore from backups to new infrastructure
-- [ ] Measure total recovery time
-- [ ] Test failover procedures
-- [ ] Update documentation based on findings
-- [ ] Report results to stakeholders
-
-### Backup Verification
-
-- [ ] Automated daily backup integrity checks
-- [ ] Alert if backup size deviates >20% from expected
-- [ ] Alert if backup age exceeds threshold
-- [ ] Verify backups are encrypted
-- [ ] Verify backups are in separate region
+Automated daily backup integrity checks. Alert if backup size deviates >20% from expected or backup age exceeds threshold. Verify backups are encrypted and in separate region.
 
 ## High Availability
 
-- [ ] Run multiple application instances (min 2)
-- [ ] Use database replication (streaming replica)
-- [ ] Configure health checks and auto-restart
-- [ ] Plan for region failover
-- [ ] Test failover procedures quarterly
+Run multiple application instances (min 2). Use database replication (streaming replica). Configure health checks and auto-restart. Plan for region failover. Test failover procedures quarterly.
 
 ## Incident Response
 
-- [ ] Document incident response procedure
-- [ ] Define on-call rotation
-- [ ] Create runbooks for common issues
-- [ ] Conduct blameless post-mortems
-- [ ] Track incidents and resolution times
+Document incident response procedure. Define on-call rotation. Create runbooks for common issues. Conduct blameless post-mortems. Track incidents and resolution times.
 
 ---
 
 # Development Workflow
 
-## Key Decisions
+Use GitHub Flow for branching (simple, effective). Use Conventional Commits (consistent, automation-friendly). Require PR reviews for code quality.
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Branching | GitHub Flow | Simple, effective |
-| Commits | Conventional Commits | Consistent, automation-friendly |
-| Reviews | Required PR reviews | Code quality |
+## Git Workflow
 
-## Implementation Checklist
+Main branch is always deployable. Feature branches for development. Require PR reviews before merge. Squash commits on merge.
 
-### Git Workflow
+## Code Quality
 
-- [ ] Main branch is always deployable
-- [ ] Feature branches for development
-- [ ] Require PR reviews before merge
-- [ ] Squash commits on merge
+Run linter on commit (pre-commit hook). Run tests on push. Require passing CI for merge. Use code formatting tools (mix format, prettier).
 
-### Code Quality
-
-- [ ] Run linter on commit (pre-commit hook)
-- [ ] Run tests on push
-- [ ] Require passing CI for merge
-- [ ] Use code formatting tools (mix format, prettier)
-
-### Dependency Security
+## Dependency Security
 
 Automate vulnerability detection in dependencies.
 
-#### Backend (Elixir)
+**Backend (Elixir)**: Run `mix deps.audit` and `mix hex.audit` in CI (via `mix_audit` package). Pin major versions in `mix.exs`. Review dependency updates weekly. Subscribe to security advisories for critical deps.
 
-- [ ] Run `mix deps.audit` in CI (via `mix_audit` package)
-- [ ] Run `mix hex.audit` for Hex package advisories
-- [ ] Pin major versions in `mix.exs`
-- [ ] Review dependency updates weekly
-- [ ] Subscribe to security advisories for critical deps
+**Frontend (npm/pnpm)**: Run `pnpm audit` in CI. Enable Dependabot or Renovate for automated PRs. Set up GitHub security alerts. Review and merge security PRs promptly.
 
-```elixir
-# mix.exs - Add mix_audit
-{:mix_audit, "~> 2.0", only: [:dev, :test], runtime: false}
-```
+Block merges if audit finds high/critical vulnerabilities. Document exceptions for false positives. Update dependencies at least monthly. Monitor CVE databases for zero-days.
 
-```yaml
-# CI step
-- name: Security Audit
-  run: |
-    mix deps.audit
-    mix hex.audit
-```
+## Documentation
 
-#### Frontend (npm/pnpm)
-
-- [ ] Run `pnpm audit` in CI
-- [ ] Enable Dependabot or Renovate for automated PRs
-- [ ] Set up GitHub security alerts
-- [ ] Review and merge security PRs promptly
-
-```yaml
-# .github/dependabot.yml
-version: 2
-updates:
-  - package-ecosystem: "mix"
-    directory: "/backend"
-    schedule:
-      interval: "weekly"
-  - package-ecosystem: "npm"
-    directory: "/frontend"
-    schedule:
-      interval: "weekly"
-```
-
-#### Security Practices
-
-- [ ] Block merges if audit finds high/critical vulnerabilities
-- [ ] Document exceptions for false positives
-- [ ] Update dependencies at least monthly
-- [ ] Monitor CVE databases for zero-days
-
-### Documentation
-
-- [ ] Keep README up to date
-- [ ] Document setup process
-- [ ] Maintain CHANGELOG
-- [ ] Document API changes
+Keep README up to date. Document setup process. Maintain CHANGELOG. Document API changes.
 
 ---
 
 # Testing Infrastructure
-
-## Test Types and Tools
 
 | Test Type | Backend Tool | Frontend Tool |
 |-----------|--------------|---------------|
@@ -1984,11 +1728,7 @@ updates:
 
 **IMPORTANT**: Never use random data in tests or seeds. All test data must be deterministic.
 
-- [ ] No `Faker` or random generators in factories
-- [ ] Use explicit, predictable values ("test@example.com", not random email)
-- [ ] Seeds produce identical data on every run
-- [ ] Tests are reproducible and debuggable
-- [ ] Timestamps use fixed values or `~U[2024-01-01 00:00:00Z]`
+No `Faker` or random generators in factories. Use explicit, predictable values ("test@example.com", not random email). Seeds produce identical data on every run. Tests are reproducible and debuggable. Timestamps use fixed values or `~U[2024-01-01 00:00:00Z]`.
 
 Rationale: Random data causes flaky tests and makes debugging difficult. Deterministic data ensures consistent behavior across runs.
 
@@ -2010,14 +1750,6 @@ defmodule MyApp.Factory do
     |> Map.merge(attrs)
   end
 
-  def build(:organization, attrs \\ %{}) do
-    %MyApp.Organization{
-      name: "Test Org",
-      slug: "test-org"
-    }
-    |> Map.merge(attrs)
-  end
-
   def insert(factory, attrs \\ %{}) do
     factory
     |> build(attrs)
@@ -2026,46 +1758,19 @@ defmodule MyApp.Factory do
 end
 ```
 
-### Factory Rules
+`build/2` returns struct without inserting. `insert/2` builds and inserts to database. Default values are deterministic (no random). Override via attrs map for test-specific values. Keep factories in `test/support/factory.ex`.
 
-- [ ] `build/2` returns struct without inserting
-- [ ] `insert/2` builds and inserts to database
-- [ ] Default values are deterministic (no random)
-- [ ] Override via attrs map for test-specific values
-- [ ] Keep factories in `test/support/factory.ex`
+## Backend Testing
 
-## Implementation Checklist
+Unit test contexts and schemas. Test controllers with integration tests. Use simple factory pattern for test data. Test with Ecto sandbox for isolation. Mock external services. No random data in tests.
 
-### Backend Testing
+## Frontend Testing
 
-- [ ] Unit test contexts and schemas
-- [ ] Test controllers with integration tests
-- [ ] Use simple factory pattern for test data
-- [ ] Test with Ecto sandbox for isolation
-- [ ] Mock external services
-- [ ] No random data in tests
+Unit test utilities and hooks. Component tests with React Testing Library. Mock API responses with MSW. Test user interactions.
 
-### Frontend Testing
+## E2E Testing (Playwright)
 
-- [ ] Unit test utilities and hooks
-- [ ] Component tests with React Testing Library
-- [ ] Mock API responses with MSW
-- [ ] Test user interactions
-
-### E2E Testing (Playwright)
-
-End-to-end tests verify critical user journeys work correctly across the full stack.
-
-**Key Decisions**
-
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Framework | Playwright | Cross-browser, fast, great DX |
-| Run against | Staging or local | Real backend, seeded data |
-| Pattern | Page Object Model | Maintainable, reusable |
-| Parallelism | Per-file | Isolated test data per file |
-
-**Project Structure**
+End-to-end tests verify critical user journeys work correctly across the full stack. Use Playwright (cross-browser, fast, great DX). Run against staging or local with real backend and seeded data. Use Page Object Model for maintainable, reusable tests. Parallelize per-file with isolated test data.
 
 ```
 frontend/
