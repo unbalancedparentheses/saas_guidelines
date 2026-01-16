@@ -483,85 +483,33 @@ Downsides: larger storage (16 bytes vs 4-8), potentially slower index performanc
 
 # AUTHENTICATION & AUTHORIZATION
 
-## Key Decisions
+Use JWT tokens with short-lived access tokens (15 minutes) and long-lived refresh tokens (30 days). Store tokens in httpOnly cookies for XSS protection. Use bcrypt for password hashing. Implement policy-based authorization for flexible, testable rules.
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Token type | JWT | Stateless, scalable |
-| Token storage | httpOnly cookie | XSS protection |
-| Access token TTL | 15 minutes | Short-lived for security |
-| Refresh token TTL | 30 days | Long-lived for UX |
-| Password hashing | bcrypt | Industry standard, adjustable cost |
-| Authorization | Policy-based | Flexible, testable rules |
+## Backend
 
-## Implementation Checklist
+Use Guardian (or Joken) for JWT generation and verification. Create an Auth plug to extract and validate tokens from requests. Store refresh tokens in the database with device fingerprint for "logout from all devices" support. Implement a token refresh endpoint. Create policy modules for authorization (e.g., `ProjectPolicy`) with role-based access (admin, member, viewer). Log all authentication events (login, logout, failed attempts) and implement account lockout after N failed attempts.
 
-### Backend
+## Frontend
 
-- [ ] Implement Guardian for JWT generation and verification
-- [ ] Create Auth plug to extract and validate tokens from requests
-- [ ] Store refresh tokens in database with device fingerprint
-- [ ] Implement token refresh endpoint
-- [ ] Create policy modules for authorization (e.g., `ProjectPolicy`)
-- [ ] Support role-based access (admin, member, viewer)
-- [ ] Log all authentication events (login, logout, failed attempts)
-- [ ] Implement account lockout after N failed attempts
+Tokens are set via httpOnly cookies by the backend—the frontend never sees the actual token. Implement a fetch interceptor to handle token refresh on 401 responses. Create an AuthContext for current user state and a ProtectedRoute component for guarded routes. Handle 401 responses globally by redirecting to login. Clear auth state on logout.
 
-### Frontend
+## Security
 
-- [ ] Store tokens in httpOnly cookies (set by backend)
-- [ ] Implement axios/fetch interceptor for token refresh
-- [ ] Create AuthContext for current user state
-- [ ] Build ProtectedRoute component for guarded routes
-- [ ] Handle 401 responses globally (redirect to login)
-- [ ] Clear auth state on logout
-
-### Security
-
-- [ ] Use secure, httpOnly, sameSite cookies
-- [ ] Implement CSRF protection for cookie-based auth
-- [ ] Rate limit login attempts
-- [ ] Invalidate all sessions on password change
-- [ ] Support "logout from all devices"
+All cookies must be secure (HTTPS only), httpOnly (no JavaScript access), and SameSite=Lax. Implement CSRF protection if using cookie-based auth. Rate limit login attempts. Invalidate all sessions on password change.
 
 ---
 
 # CORS (Cross-Origin Resource Sharing)
 
-Configure CORS to allow your frontend to communicate with the API.
+Use `cors_plug` to allow your frontend to communicate with the API. Never use `*` for origins in production—always use an explicit allowlist.
 
-## Key Decisions
+## Configuration
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Library | `cors_plug` | Simple, well-maintained |
-| Origins | Explicit allowlist | Never use `*` in production |
-| Credentials | Allow with cookies | Required for httpOnly cookie auth |
+Allowlist specific origins (frontend domains) and allow credentials for cookie-based auth. Specify allowed methods (GET, POST, PUT, PATCH, DELETE, OPTIONS) and headers (Content-Type, Authorization, X-Requested-With). Set preflight cache max age to 86400 seconds.
 
-## Implementation Checklist
+Load origins from environment variables: development allows `http://localhost:3000` and `http://localhost:5173`, staging allows `https://staging.yourapp.com`, production allows `https://yourapp.com` and `https://www.yourapp.com`.
 
-### Configuration
-
-- [ ] Install and configure `cors_plug`
-- [ ] Allowlist specific origins (frontend domains)
-- [ ] Allow credentials for cookie-based auth
-- [ ] Specify allowed methods (GET, POST, PUT, PATCH, DELETE, OPTIONS)
-- [ ] Specify allowed headers (Content-Type, Authorization, X-Requested-With)
-- [ ] Set appropriate max age for preflight cache (86400 seconds)
-
-### Environment-specific Origins
-
-- [ ] Development: `http://localhost:3000`, `http://localhost:5173`
-- [ ] Staging: `https://staging.yourapp.com`
-- [ ] Production: `https://yourapp.com`, `https://www.yourapp.com`
-- [ ] Load origins from environment variable
-
-### Security Considerations
-
-- [ ] Never use `*` for origins in production
-- [ ] Don't expose sensitive headers unnecessarily
-- [ ] Review CORS config when adding subdomains
-- [ ] Test preflight requests work correctly
+Review CORS config when adding subdomains. Test that preflight requests work correctly.
 
 ---
 
@@ -889,16 +837,9 @@ Use OpenAPI 3.0 generated from code annotations (single source of truth). Docume
 
 **Warning**: Total connections across all instances must not exceed `max_connections` in PostgreSQL (default: 100).
 
-### Implementation Checklist
+### Implementation
 
-- [ ] Configure Ecto pool size in runtime config
-- [ ] Set `pool_size` based on environment
-- [ ] Set `queue_target: 50` and `queue_interval: 1000` for backpressure
-- [ ] Set up PgBouncer for production (connection multiplexing)
-- [ ] Monitor `Ecto.Repo` telemetry for checkout times
-- [ ] Handle `DBConnection.ConnectionError` gracefully
-- [ ] Use separate pools for long-running queries (reports, exports)
-- [ ] Alert when pool checkout times exceed threshold
+Configure Ecto pool size in `runtime.exs` based on environment. Set `queue_target: 50` and `queue_interval: 1000` for backpressure. Use PgBouncer for production connection multiplexing. Monitor `Ecto.Repo` telemetry for checkout times. Handle `DBConnection.ConnectionError` gracefully. Use separate pools for long-running queries (reports, exports). Alert when pool checkout times exceed threshold.
 
 ### Configuration Example
 
@@ -934,14 +875,9 @@ Enum.map(users, fn user -> user.organization.name end)
 | `from ... preload` | In query, JOIN-based |
 | `Dataloader` | GraphQL, batched loading |
 
-### Implementation Checklist
+### Implementation
 
-- [ ] Always preload associations before accessing them
-- [ ] Use `Repo.preload/2` for simple cases
-- [ ] Use query-based preload with `join` for filtering
-- [ ] Never access associations in Enum.map without preload
-- [ ] Add EctoDevLogger in dev to spot N+1 queries
-- [ ] Consider Dataloader for complex GraphQL resolvers
+Always preload associations before accessing them. Use `Repo.preload/2` for simple cases and query-based preload with `join` for filtering. Never access associations in `Enum.map` without preload. Add EctoDevLogger in dev to spot N+1 queries. Consider Dataloader for complex GraphQL resolvers.
 
 ### Common Patterns
 
