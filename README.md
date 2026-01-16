@@ -336,144 +336,59 @@ Every log includes: `timestamp`, `level`, `request_id`, `user_id`, `org_id`
 
 # NIX DEVELOPMENT ENVIRONMENT
 
-Reproducible development environments using Nix flakes. No Docker required.
+Use Nix flakes for reproducible development environments. No Docker required—Nix provides better reproducibility without container overhead.
 
-## Key Decisions
+## Overview
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Nix version | Flakes | Modern, reproducible, lockfile support |
-| Shell | devShell | Project-specific environment |
-| Direnv | nix-direnv | Auto-load on directory entry |
-| Services | devenv or process-compose | Run Postgres, Redis, Meilisearch via Nix |
-| Avoid | Docker | Nix provides reproducibility without containers |
+Create a `flake.nix` that defines inputs (nixpkgs, flake-utils, devenv), pins nixpkgs to a specific commit for reproducibility, and creates a devShell with all dependencies. Include Elixir and Erlang (matching production versions), Node.js with pnpm, PostgreSQL (server + client), Redis, Meilisearch, Git, GNU Make, and direnv.
 
-## Implementation Checklist
+## Local Services
 
-### flake.nix
+Use devenv or process-compose to run all services locally without Docker. Configure PostgreSQL, Redis, and Meilisearch with project-local data directories (under `.devenv/state/`). Add Mailpit for email testing. All services should start with a single command (`devenv up` or `make services`).
 
-- [ ] Define inputs (nixpkgs, flake-utils, devenv)
-- [ ] Pin nixpkgs to specific commit for reproducibility
-- [ ] Create devShell with all dependencies
-- [ ] Include Elixir, Erlang, Node.js versions
-- [ ] Add PostgreSQL, Redis, Meilisearch
-- [ ] Include development tools (git, make)
+In devenv.nix, enable services like `services.postgres.enable = true` and `services.redis.enable = true`. Configure non-default ports to avoid conflicts with system services.
 
-### Dependencies to Include
+## Shell Hooks
 
-- [ ] Elixir (specific version matching production)
-- [ ] Erlang/OTP (specific version)
-- [ ] Node.js and pnpm
-- [ ] PostgreSQL (server + client)
-- [ ] Redis
-- [ ] Meilisearch
-- [ ] Git
-- [ ] GNU Make
-- [ ] direnv
+Set MIX_HOME and HEX_HOME to project-local paths so Hex packages stay within the project. Configure ERL_AFLAGS for better shell experience. Set DATABASE_URL and REDIS_URL environment variables pointing to local services. Optionally print a welcome message showing available commands.
 
-### Local Services (devenv or process-compose)
+## .envrc
 
-Run all services locally without Docker:
+Keep it minimal: use the `use flake` directive and optionally load a `.env` file. nix-direnv handles caching automatically.
 
-- [ ] PostgreSQL with project-local data directory
-- [ ] Redis with project-local persistence
-- [ ] Meilisearch with project-local data
-- [ ] Mailpit for email testing
-- [ ] All services start with single command (`devenv up` or `make services`)
+## Why Nix Over Docker
 
-### devenv.nix Example Structure
-
-- [ ] Define `services.postgres.enable = true`
-- [ ] Define `services.redis.enable = true`
-- [ ] Configure ports to avoid conflicts
-- [ ] Set data directories under `.devenv/state/`
-- [ ] Add process scripts for Phoenix server
-
-### Shell Hooks
-
-- [ ] Set MIX_HOME to project-local path
-- [ ] Set HEX_HOME to project-local path
-- [ ] Configure ERL_AFLAGS for better shell experience
-- [ ] Set DATABASE_URL pointing to local Postgres
-- [ ] Set REDIS_URL pointing to local Redis
-- [ ] Print welcome message with available commands
-
-### .envrc
-
-- [ ] Use `use flake` directive
-- [ ] Load `.env` file if present
-- [ ] Keep minimal (nix-direnv handles caching)
-
-### Benefits Over Docker
-
-- [ ] Faster startup (no container overhead)
-- [ ] Native performance
-- [ ] Easier debugging (no container boundaries)
-- [ ] Same Nix config works for dev and CI
-- [ ] No Docker Desktop license concerns
-- [ ] Simpler networking (localhost just works)
+Nix provides faster startup (no container overhead), native performance, and easier debugging without container boundaries. The same Nix config works for both dev and CI. No Docker Desktop license concerns, and networking is simpler (localhost just works).
 
 ---
 
 # MAKEFILE
 
-Standard interface for common development tasks.
+Use GNU Make as a standard interface for common development tasks. Use `.PHONY` targets (task runner style, not file builder) with verb-based naming like `make test`, `make build`, `make deploy`.
 
-## Key Decisions
+## Essential Targets
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Tool | GNU Make | Universal, simple, no dependencies |
-| Style | .PHONY targets | Task runner, not file builder |
-| Naming | Verb-based | `make test`, `make build`, `make deploy` |
+Create these core targets: `setup` (deps, db create, seeds), `dev` (start development server), `test` (run all tests), `lint` (credo, eslint, format check), `format` (auto-format all code), `build` (production build), and `clean` (remove build artifacts).
 
-## Implementation Checklist
+## Database Targets
 
-### Essential Targets
+Use dotted naming for database tasks: `db.create`, `db.migrate`, `db.rollback`, `db.reset` (drop, create, migrate, seed), and `db.seed`.
 
-- [ ] `make setup` - Initial project setup (deps, db create, seeds)
-- [ ] `make dev` - Start development server
-- [ ] `make test` - Run all tests
-- [ ] `make lint` - Run linters (credo, eslint, format check)
-- [ ] `make format` - Auto-format all code
-- [ ] `make build` - Build for production
-- [ ] `make clean` - Remove build artifacts
+## Services Targets
 
-### Database Targets
+For Nix-based local services: `services` (start Postgres, Redis, etc.), `services.stop`, `services.logs`, and `services.status`.
 
-- [ ] `make db.create` - Create database
-- [ ] `make db.migrate` - Run migrations
-- [ ] `make db.rollback` - Rollback last migration
-- [ ] `make db.reset` - Drop, create, migrate, seed
-- [ ] `make db.seed` - Run seed scripts
+## CI/Deployment Targets
 
-### Services Targets (Nix-based)
+Include `ci` (run full CI suite locally), `release` (build release), `deploy.staging`, and `deploy.prod` (with confirmation prompt).
 
-- [ ] `make services` - Start all local services (Postgres, Redis, etc.)
-- [ ] `make services.stop` - Stop all services
-- [ ] `make services.logs` - Tail service logs
-- [ ] `make services.status` - Check running services
+## Help Target
 
-### CI/Deployment Targets
+Make `help` the default target. Use `##` comments after target names for auto-generated help text.
 
-- [ ] `make ci` - Run full CI suite locally
-- [ ] `make release` - Build release
-- [ ] `make deploy.staging` - Deploy to staging
-- [ ] `make deploy.prod` - Deploy to production (with confirmation)
+## Best Practices
 
-### Help Target
-
-- [ ] `make help` - List all targets with descriptions
-- [ ] Use `##` comments for auto-generated help
-- [ ] Make `help` the default target
-
-### Best Practices
-
-- [ ] Use variables for repeated values
-- [ ] Chain related commands with `&&`
-- [ ] Add confirmation prompts for destructive actions
-- [ ] Color output for better readability
-- [ ] Support `make target ENV=production` overrides
+Use variables for repeated values. Chain related commands with `&&`. Add confirmation prompts for destructive actions. Support environment overrides like `make target ENV=production`.
 
 ---
 
@@ -495,6 +410,8 @@ lib/
     endpoint.ex             # HTTP endpoint config
 ```
 
+Keep controllers thin—they delegate to contexts for business logic.
+
 ## Frontend Structure
 
 ```
@@ -510,9 +427,11 @@ src/
   types/                    # TypeScript types
 ```
 
-## Umbrella Projects (Optional)
+Use barrel exports (index.ts) for cleaner imports. Colocate components with their tests.
 
-For larger applications, consider an umbrella project structure:
+## Umbrella Projects
+
+For larger applications, use an umbrella structure:
 
 ```
 apps/
@@ -527,26 +446,13 @@ apps/
       channels/
       router.ex
   my_app_worker/               # Background job processing
-    lib/my_app_worker/
-      workers/
 ```
 
-### When to Use Umbrella
+Use umbrella when you have a large team with clear domain boundaries, need independent compilation/testing per app, or want enforced dependency direction (web depends on core, not vice versa). Skip umbrella for small teams or early-stage projects.
 
-- [ ] Large team with clear domain boundaries
-- [ ] Need independent compilation/testing per app
-- [ ] Planning to extract apps into separate services later
-- [ ] Want enforced dependency direction (web depends on core, not vice versa)
+## Single Shared Repository Pattern
 
-### When NOT to Use Umbrella
-
-- [ ] Small team or early-stage project
-- [ ] Unclear domain boundaries
-- [ ] Added complexity not justified by benefits
-
-### Single Shared Repository Pattern
-
-**IMPORTANT**: All umbrella apps share ONE Ecto repository. Never create app-specific repos.
+**Critical**: All umbrella apps share ONE Ecto repository. Never create app-specific repos.
 
 ```
 apps/
@@ -563,65 +469,15 @@ apps/
   my_app_billing/                # Billing domain (uses MyAppRepo.Repo)
 ```
 
-### Why Single Repository
+This provides simpler transaction management across domains, one migration path with no ordering conflicts, clear schema ownership, and avoids circular dependencies. Domain apps depend on the repo app and contain only business logic, not schemas.
 
-- [ ] Simpler transaction management across domains
-- [ ] One migration path, no ordering conflicts
-- [ ] Clear schema ownership in one location
-- [ ] Avoids circular dependencies between apps
-- [ ] Easier to reason about database state
+## UUIDs for Primary Keys
 
-### Implementation Rules
+Use UUIDs (UUID v4) instead of auto-incrementing integers. Benefits: prevents ID enumeration attacks (can't guess `/users/2` from `/users/1`), allows client-side ID generation before insert, enables merging data from multiple databases without conflicts, and hides business information (user count, order volume).
 
-- [ ] Create dedicated `my_app_repo` app for database layer
-- [ ] All Ecto schemas live in `my_app_repo/lib/my_app_repo/schemas/`
-- [ ] All migrations live in `my_app_repo/priv/repo/migrations/`
-- [ ] Domain apps depend on repo app, never vice versa
-- [ ] Domain apps contain business logic, not schemas
+In Ecto, use `:binary_id` as the primary key type. Set `@primary_key {:id, :binary_id, autogenerate: true}` and `@foreign_key_type :binary_id` in schemas. Create a base schema module with these defaults.
 
-## UUIDs vs Auto-increment IDs
-
-Use UUIDs as primary keys instead of auto-incrementing integers.
-
-### Key Decisions
-
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| ID type | UUID v4 | No enumeration, distributed generation |
-| Storage | `uuid` column type | Native PostgreSQL support |
-| Generation | Database or application | Both work, database is simpler |
-
-### Benefits of UUIDs
-
-- [ ] No ID enumeration attacks (can't guess `/users/2` from `/users/1`)
-- [ ] Generate IDs client-side before insert
-- [ ] Merge data from multiple databases without conflicts
-- [ ] Hide business information (user count, order volume)
-- [ ] Works naturally with distributed systems
-
-### Implementation
-
-- [ ] Use `:binary_id` as primary key type in Ecto schema
-- [ ] Configure migration generator to use UUIDs by default
-- [ ] Set `@primary_key {:id, :binary_id, autogenerate: true}` in schemas
-- [ ] Set `@foreign_key_type :binary_id` in schemas
-- [ ] Create base schema module with UUID defaults
-
-### Downsides to Consider
-
-- [ ] Larger storage (16 bytes vs 4-8 bytes)
-- [ ] Slower index performance (random distribution)
-- [ ] Less readable in logs/debugging
-- [ ] Consider UUIDv7 for time-sortable IDs (if ordering matters)
-
-## Implementation Checklist
-
-- [ ] Organize backend code by domain contexts (accounts, billing, projects)
-- [ ] Keep web layer thin - controllers should delegate to contexts
-- [ ] Use changesets for all data validation
-- [ ] Use UUIDs for all primary keys
-- [ ] Colocate frontend components with their tests
-- [ ] Use barrel exports (index.ts) for cleaner imports
+Downsides: larger storage (16 bytes vs 4-8), potentially slower index performance due to random distribution, less readable in logs. Consider UUIDv7 if time-sortable IDs matter.
 
 ---
 
