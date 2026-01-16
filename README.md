@@ -281,7 +281,7 @@ Every log includes: `timestamp`, `level`, `request_id`, `user_id`, `org_id`
 
 ---
 
-# TECHNOLOGY STACK
+# Technology Stack
 
 ## Backend
 
@@ -334,7 +334,7 @@ Every log includes: `timestamp`, `level`, `request_id`, `user_id`, `org_id`
 
 ---
 
-# NIX DEVELOPMENT ENVIRONMENT
+# Nix Development Environment
 
 Use Nix flakes for reproducible development environments. No Docker required—Nix provides better reproducibility without container overhead.
 
@@ -362,7 +362,7 @@ Nix provides faster startup (no container overhead), native performance, and eas
 
 ---
 
-# MAKEFILE
+# Makefile
 
 Use GNU Make as a standard interface for common development tasks. Use `.PHONY` targets (task runner style, not file builder) with verb-based naming like `make test`, `make build`, `make deploy`.
 
@@ -392,7 +392,7 @@ Use variables for repeated values. Chain related commands with `&&`. Add confirm
 
 ---
 
-# PROJECT STRUCTURE
+# Project Structure
 
 ## Backend Structure
 
@@ -481,13 +481,13 @@ Downsides: larger storage (16 bytes vs 4-8), potentially slower index performanc
 
 ---
 
-# AUTHENTICATION & AUTHORIZATION
+# Authentication & Authorization
 
-Use JWT tokens with short-lived access tokens (15 minutes) and long-lived refresh tokens (30 days). Store tokens in httpOnly cookies for XSS protection. Use bcrypt for password hashing. Implement policy-based authorization for flexible, testable rules.
+Use JWT tokens with short-lived access tokens (15 minutes) and long-lived refresh tokens (7 days). Store tokens in httpOnly cookies for XSS protection. Use Argon2 for password hashing. Implement policy-based authorization for flexible, testable rules.
 
 ## Backend
 
-Use Guardian (or Joken) for JWT generation and verification. Create an Auth plug to extract and validate tokens from requests. Store refresh tokens in the database with device fingerprint for "logout from all devices" support. Implement a token refresh endpoint. Create policy modules for authorization (e.g., `ProjectPolicy`) with role-based access (admin, member, viewer). Log all authentication events (login, logout, failed attempts) and implement account lockout after N failed attempts.
+Use Joken for simple JWT encode/decode. Create an Auth plug to extract and validate tokens from requests. Store refresh tokens in the database with device fingerprint for "logout from all devices" support. Implement a token refresh endpoint. Create policy modules for authorization (e.g., `ProjectPolicy`) with role-based access (admin, member, viewer). Log all authentication events (login, logout, failed attempts) and implement account lockout after N failed attempts.
 
 ## Frontend
 
@@ -513,7 +513,7 @@ Review CORS config when adding subdomains. Test that preflight requests work cor
 
 ---
 
-# SECURITY
+# Security
 
 Defense in depth with HTTP headers, secure cookies, input validation, and protection against common attacks.
 
@@ -553,7 +553,7 @@ For SPAs using JWT authentication, CSRF is less of a concern since tokens aren't
 
 ---
 
-# OAUTH / SOCIAL LOGIN
+# OAuth / Social Login
 
 Use `ueberauth` with provider strategies (`ueberauth_google`, `ueberauth_github`) for OAuth authentication. Store OAuth credentials in environment variables and configure callback URLs in each provider's developer console.
 
@@ -565,7 +565,7 @@ Always validate the email is verified from the provider. Don't blindly trust pro
 
 ---
 
-# API KEYS
+# API Keys
 
 API keys use a prefixed format (`sk_live_xxx`, `sk_test_xxx`) for easy identification. Generate 32 random bytes, base62 encode, add prefix. Store only the SHA-256 hash in the database—never the plaintext. Show the full key once on creation with a copy button and warning.
 
@@ -575,7 +575,7 @@ Authentication: accept key in `Authorization: Bearer` header, hash incoming key,
 
 ---
 
-# MAGIC LINKS
+# Magic Links
 
 Magic links allow passwordless sign-in via email. Generate a secure random token (32 bytes), sign it with `Phoenix.Token` including user_id and timestamp, store the hash in a `magic_links` table, and email the plaintext link. Tokens expire in 15 minutes and are single-use.
 
@@ -585,7 +585,7 @@ On verification: extract token from URL, verify signature and expiration, check 
 
 ---
 
-# TWO-FACTOR AUTHENTICATION (2FA)
+# Two-Factor Authentication (2FA)
 
 Use TOTP (RFC 6238) with `nimble_totp` for code generation/verification and `eqrcode` for QR codes. Works with Google Authenticator, Authy, and 1Password.
 
@@ -599,7 +599,7 @@ Encrypt TOTP secrets at rest, hash backup codes, rate limit verification attempt
 
 ---
 
-# SESSION MANAGEMENT
+# Session Management
 
 Store sessions in a database table for persistence and queryability. The `sessions` table needs: `user_id`, `token_hash` (SHA-256 of JWT), `device_name`, `device_type`, `browser`, `os`, `ip_address`, `location` (optional geo-lookup), `last_active_at`, `expires_at`, and `revoked_at`.
 
@@ -609,7 +609,7 @@ Show users their active sessions in account settings with device icons, browser 
 
 ---
 
-# PASSWORD POLICIES
+# Password Policies
 
 Minimum 12 characters (NIST recommendation), maximum 128 (prevent DoS). Check passwords against HaveIBeenPwned API using k-anonymity (send first 5 chars of SHA-1 hash, compare against returned list). Keep history of last 5 password hashes to prevent reuse.
 
@@ -619,7 +619,7 @@ Show a password strength indicator during input. Rate limit reset requests, expi
 
 ---
 
-# EMAIL VERIFICATION
+# Email Verification
 
 On signup, generate a secure token signed with `Phoenix.Token`, store its hash, and email a verification link. Tokens expire in 24 hours and are single-use.
 
@@ -631,7 +631,7 @@ When a user changes their email, require re-verification. Optionally auto-delete
 
 ---
 
-# API DESIGN
+# API Design
 
 Use REST with URL-based versioning (`/api/v1/`). All responses use consistent JSON structure: `{ "data": ... }` for success with optional `"meta"` for pagination, and `{ "error": { "code": "...", "message": "...", "details": {...} } }` for errors following RFC 7807.
 
@@ -649,7 +649,7 @@ Create a Plug that captures `client_ip` (checking `X-Forwarded-For` for proxied 
 
 ---
 
-# IDEMPOTENCY KEYS
+# Idempotency Keys
 
 Support Stripe-style idempotency via the `Idempotency-Key` header for safe retries on mutation endpoints. Clients generate a UUID per operation and reuse it for retries.
 
@@ -661,7 +661,7 @@ Apply to POST, PUT, PATCH, DELETE endpoints. Skip for GET (naturally idempotent)
 
 ---
 
-# WEBHOOKS
+# Webhooks
 
 ## Outgoing Webhooks
 
@@ -683,7 +683,7 @@ Return 200 immediately to acknowledge receipt, then enqueue Oban job for async p
 
 ---
 
-# FRONTEND ARCHITECTURE
+# Frontend Architecture
 
 Use TanStack Query for server state (API calls) with caching disabled (`staleTime: 0`, `cacheTime: 0`)—always fetch fresh data. Use Zustand only for UI state (modals, sidebar, theme). Use Dexie.js (IndexedDB wrapper) for offline data persistence.
 
@@ -713,7 +713,7 @@ Target: main JS < 200 KB gzipped, main CSS < 50 KB, per-route chunk < 100 KB. La
 
 ---
 
-# BACKGROUND JOBS
+# Background Jobs
 
 Use Oban for PostgreSQL-backed job processing. Configure separate queues by priority: `default`, `mailers`, `webhooks`, `maintenance`. Each queue has its own concurrency limit. Add Oban to the supervision tree and configure the pruner to clean completed jobs.
 
@@ -723,7 +723,7 @@ Use `Oban.insert/1` for immediate jobs, `scheduled_at` for delayed execution, an
 
 ---
 
-# EMAIL
+# Email
 
 Use Swoosh with a provider adapter (Postmark, SendGrid, or SES) for transactional emails. Create a base email module with default `from` and `reply-to`. Use sandbox adapter for tests and implement a preview route for development.
 
@@ -733,7 +733,7 @@ Send emails asynchronously via Oban EmailWorker to avoid blocking requests. Hand
 
 ---
 
-# RATE LIMITING
+# Rate Limiting
 
 Use Hammer with Redis backend for distributed rate limiting with token bucket algorithm. Scope limits per-user for authenticated requests and per-IP for anonymous requests.
 
@@ -743,7 +743,7 @@ Create a RateLimit plug that returns 429 with `Retry-After` header when exceeded
 
 ---
 
-# FILE UPLOADS & STORAGE
+# File Uploads & Storage
 
 Use S3-compatible storage with presigned URLs for direct client uploads (avoids server load). Flow: client requests presigned URL → uploads directly to S3 → notifies server of completion → server validates and enqueues processing job.
 
@@ -753,7 +753,7 @@ Organize storage by tenant: `uploads/{tenant_id}/{uuid}.{ext}`. Store metadata (
 
 ---
 
-# SEARCH
+# Search
 
 Use Meilisearch for fast, typo-tolerant full-text search. Index data asynchronously via Oban workers on create/update/delete events. Define searchable, filterable, and sortable attributes per index.
 
@@ -763,7 +763,7 @@ Handle bulk reindexing for initial data load or schema changes.
 
 ---
 
-# BILLING & SUBSCRIPTIONS
+# Billing & Subscriptions
 
 Use Stripe for subscription billing. Create a Stripe Customer when users sign up. Implement checkout session creation for plan selection. Store subscription status locally (synced via webhooks).
 
@@ -773,7 +773,7 @@ Build subscription management UI: plan selection, upgrade/downgrade, cancellatio
 
 ---
 
-# FEATURE FLAGS
+# Feature Flags
 
 Use FunWithFlags with Redis backend for feature flags. Support multiple targeting types: boolean (on/off globally), actor-based (specific users), group-based (by plan or role), and percentage rollout for gradual releases.
 
@@ -781,7 +781,7 @@ Check flags in controllers and contexts. Pass flag state to frontend for conditi
 
 ---
 
-# AUDIT LOGGING
+# Audit Logging
 
 Log all create, update, delete operations plus auth events to a separate `audit_logs` table. Schema: `action`, `resource_type`, `resource_id`, `actor_id`, `actor_type` ("user", "system", "api_key"), `changes` (jsonb with before/after), `metadata` (IP, user agent, request_id), `inserted_at`.
 
@@ -789,7 +789,7 @@ Implement an audit logging helper called from context functions. Consider async 
 
 ---
 
-# INTERNATIONALIZATION
+# Internationalization
 
 Use Gettext on the backend—extract strings to PO files and translate error messages. Implement a locale plug that reads from `Accept-Language` header or user preference stored in database.
 
@@ -797,7 +797,7 @@ Use react-i18next on the frontend with JSON translation files. Handle pluralizat
 
 ---
 
-# DATA EXPORT & GDPR
+# Data Export & GDPR
 
 For data export, collect all user data (including related records) and generate a ZIP with JSON and CSV files. Process in a background job (large exports take time), upload to S3 with an expiring download link, and email the user when ready.
 
@@ -807,13 +807,13 @@ Document data retention policies, track privacy policy acceptance with timestamp
 
 ---
 
-# API DOCUMENTATION
+# API Documentation
 
 Use OpenAPI 3.0 generated from code annotations (single source of truth). Document all endpoints with request/response schemas, authentication requirements, example requests, and error codes. Serve interactive documentation via Redoc or Swagger UI. Version documentation with the API.
 
 ---
 
-# DATABASE
+# Database
 
 ## Connection Pooling
 
@@ -1263,7 +1263,7 @@ Compose multiple database operations into atomic transactions.
 
 ---
 
-# MULTI-TENANCY
+# Multi-Tenancy
 
 Isolate customer data from day 1. Add `org_id` to all transactional tables.
 
@@ -1373,7 +1373,7 @@ end
 
 ---
 
-# ENVIRONMENT CONFIGURATION
+# Environment Configuration
 
 ## Key Decisions
 
@@ -1393,7 +1393,7 @@ end
 
 ---
 
-# SECRETS MANAGEMENT
+# Secrets Management
 
 ## Key Decisions
 
@@ -1413,7 +1413,7 @@ end
 
 ---
 
-# OBSERVABILITY
+# Observability
 
 ## Key Decisions
 
@@ -1619,7 +1619,7 @@ Logger.info("User updated", user: LogSanitizer.sanitize(user_params))
 
 ---
 
-# REQUEST ID / CORRELATION ID
+# Request ID / Correlation ID
 
 Trace requests across your entire system for debugging and observability.
 
@@ -1678,7 +1678,7 @@ Trace requests across your entire system for debugging and observability.
 
 ---
 
-# CIRCUIT BREAKERS
+# Circuit Breakers
 
 Protect your application from cascading failures when external services are down.
 
@@ -1753,7 +1753,7 @@ Protect your application from cascading failures when external services are down
 
 ---
 
-# RETRY LOGIC & TIMEOUTS
+# Retry Logic & Timeouts
 
 Handle transient failures gracefully with retries and prevent hanging requests with timeouts.
 
@@ -1841,7 +1841,7 @@ Handle transient failures gracefully with retries and prevent hanging requests w
 
 ---
 
-# HEALTH CHECKS
+# Health Checks
 
 Expose endpoints for load balancers, orchestrators, and monitoring systems to verify application health.
 
@@ -1900,7 +1900,7 @@ Expose endpoints for load balancers, orchestrators, and monitoring systems to ve
 
 ---
 
-# GRACEFUL SHUTDOWN
+# Graceful Shutdown
 
 Handle termination signals properly to avoid dropped requests and data loss.
 
@@ -1948,7 +1948,7 @@ Handle termination signals properly to avoid dropped requests and data loss.
 
 ---
 
-# ERROR PAGES
+# Error Pages
 
 Custom error pages for better user experience when things go wrong.
 
@@ -1988,7 +1988,7 @@ Custom error pages for better user experience when things go wrong.
 
 ---
 
-# TERMS OF SERVICE TRACKING
+# Terms of Service Tracking
 
 Track user acceptance of terms of service and privacy policy for legal compliance.
 
@@ -2040,7 +2040,7 @@ Track user acceptance of terms of service and privacy policy for legal complianc
 
 ---
 
-# MONITORING & ALERTS
+# Monitoring & Alerts
 
 ## Key Decisions
 
@@ -2082,7 +2082,7 @@ Track user acceptance of terms of service and privacy policy for legal complianc
 
 ---
 
-# DEPLOYMENT
+# Deployment
 
 ## Key Decisions
 
@@ -2174,7 +2174,7 @@ Track user acceptance of terms of service and privacy policy for legal complianc
 
 ---
 
-# DISASTER RECOVERY
+# Disaster Recovery
 
 ## RTO and RPO Definitions
 
@@ -2276,7 +2276,7 @@ psql -c "SELECT * FROM orders WHERE created_at > NOW() - INTERVAL '1 day';"
 
 ---
 
-# DEVELOPMENT WORKFLOW
+# Development Workflow
 
 ## Key Decisions
 
@@ -2364,7 +2364,7 @@ updates:
 
 ---
 
-# TESTING INFRASTRUCTURE
+# Testing Infrastructure
 
 ## Test Types and Tools
 
@@ -2610,7 +2610,7 @@ e2e:
 
 ---
 
-# USER IMPERSONATION
+# User Impersonation
 
 Allow admins to view the app as another user for support and debugging.
 
@@ -2663,7 +2663,7 @@ Allow admins to view the app as another user for support and debugging.
 
 ---
 
-# ADMIN DASHBOARD
+# Admin Dashboard
 
 Internal tools for managing users, content, and system health.
 
@@ -2733,7 +2733,7 @@ Internal tools for managing users, content, and system health.
 
 ---
 
-# IN-APP NOTIFICATIONS
+# In-App Notifications
 
 Real-time notifications within the application UI.
 
@@ -2803,7 +2803,7 @@ Real-time notifications within the application UI.
 
 ---
 
-# ACCESSIBILITY (A11Y)
+# Accessibility (A11Y)
 
 Build an accessible application that works for everyone.
 
@@ -2945,7 +2945,7 @@ test('dashboard is accessible', async ({ page }) => {
 
 ---
 
-# ONBOARDING FLOW
+# Onboarding Flow
 
 Guide new users through setup to increase activation and reduce churn.
 
@@ -3017,7 +3017,7 @@ Guide new users through setup to increase activation and reduce churn.
 
 ---
 
-# PRODUCT ANALYTICS
+# Product Analytics
 
 Track user behavior to understand usage patterns and improve the product.
 
@@ -3102,7 +3102,7 @@ Track user behavior to understand usage patterns and improve the product.
 
 ---
 
-# CDN CONFIGURATION
+# CDN Configuration
 
 Use a CDN (Cloudflare, BunnyCDN, Fastly) to serve static assets (JS, CSS, images, fonts) from edge locations. Include content hash in filenames (`app.abc123.js`) for cache busting. Set long Cache-Control headers (`public, max-age=31536000, immutable`) for static assets.
 
@@ -3112,7 +3112,7 @@ For cache headers: static assets get long TTL, HTML pages get `no-cache`, API re
 
 ---
 
-# CACHING
+# Caching
 
 Use Redis with Redix client for distributed caching. Implement a cache module with `get/1`, `put/3`, `delete/1`, and `fetch/3` (get or compute). Use cache-aside pattern: check cache, on miss compute and store.
 
@@ -3122,7 +3122,7 @@ For HTTP caching, set appropriate `Cache-Control` headers, use `ETag` for condit
 
 ---
 
-# TEAM INVITATIONS
+# Team Invitations
 
 Allow users to invite others to join their team or organization.
 
@@ -3214,7 +3214,7 @@ Index: unique on `(team_id, email)` where not accepted/declined/revoked
 
 ---
 
-# NICE TO HAVE
+# Nice to Have
 
 ## A/B Testing Framework
 
@@ -3265,7 +3265,7 @@ Index: unique on `(team_id, email)` where not accepted/declined/revoked
 
 ---
 
-# SUMMARY
+# Summary
 
 This checklist covers the essential components for building a production-ready SaaS application. Prioritize based on your specific needs:
 
