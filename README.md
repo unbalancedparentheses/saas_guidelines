@@ -201,7 +201,7 @@ Every log includes: `timestamp`, `level`, `request_id`, `user_id`, `org_id`
 
 ## Table of Contents
 
-### PART 1: FOUNDATION (Build First)
+### Part 1: Foundation (Build First)
 1. [Technology Stack](#technology-stack)
 2. [Nix Development Environment](#nix-development-environment)
 3. [Makefile](#makefile)
@@ -211,11 +211,11 @@ Every log includes: `timestamp`, `level`, `request_id`, `user_id`, `org_id`
 7. [Environment Configuration](#environment-configuration)
 8. [Secrets Management](#secrets-management)
 
-### PART 2: ADMIN & DEMO (Day 1 Priority)
+### Part 2: Admin & Demo (Day 1 Priority)
 9. [Admin Dashboard](#admin-dashboard)
 10. [User Impersonation](#user-impersonation)
 
-### PART 3: AUTHENTICATION
+### Part 3: Authentication
 11. [Authentication & Authorization](#authentication--authorization)
 12. [Email Verification](#email-verification)
 13. [Password Policies](#password-policies)
@@ -225,7 +225,7 @@ Every log includes: `timestamp`, `level`, `request_id`, `user_id`, `org_id`
 17. [Magic Links / Passwordless Auth](#magic-links--passwordless-auth)
 18. [Two-Factor Authentication (2FA)](#two-factor-authentication-2fa)
 
-### PART 4: API & FRONTEND
+### Part 4: API & Frontend
 19. [API Design](#api-design)
 20. [Idempotency Keys](#idempotency-keys)
 21. [API Documentation](#api-documentation)
@@ -233,16 +233,16 @@ Every log includes: `timestamp`, `level`, `request_id`, `user_id`, `org_id`
 23. [Accessibility (A11Y)](#accessibility-a11y)
 24. [Error Pages](#error-pages)
 
-### PART 5: TESTING & QUALITY
+### Part 5: Testing & Quality
 25. [Testing Infrastructure](#testing-infrastructure)
 26. [Development Workflow](#development-workflow)
 
-### PART 6: SECURITY
+### Part 6: Security
 27. [CORS](#cors-cross-origin-resource-sharing)
 28. [Security](#security)
 29. [Rate Limiting](#rate-limiting)
 
-### PART 7: OPERATIONS
+### Part 7: Operations
 30. [Health Checks](#health-checks)
 31. [Graceful Shutdown](#graceful-shutdown)
 32. [Observability](#observability)
@@ -253,14 +253,14 @@ Every log includes: `timestamp`, `level`, `request_id`, `user_id`, `org_id`
 37. [Deployment](#deployment)
 38. [Disaster Recovery](#disaster-recovery)
 
-### PART 8: BACKEND & DATA
+### Part 8: Backend & Data
 39. [Background Jobs](#background-jobs)
 40. [Email](#email)
 41. [Webhooks](#webhooks)
 42. [File Uploads & Storage](#file-uploads--storage)
 43. [Search](#search)
 
-### PART 9: BUSINESS FEATURES
+### Part 9: Business Features
 44. [Billing & Subscriptions](#billing--subscriptions)
 45. [Team Invitations](#team-invitations)
 46. [Onboarding Flow](#onboarding-flow)
@@ -269,12 +269,12 @@ Every log includes: `timestamp`, `level`, `request_id`, `user_id`, `org_id`
 49. [In-App Notifications](#in-app-notifications)
 50. [Product Analytics](#product-analytics)
 
-### PART 10: COMPLIANCE
+### Part 10: Compliance
 51. [Internationalization](#internationalization)
 52. [Data Export & GDPR](#data-export--gdpr)
 53. [Terms of Service Tracking](#terms-of-service-tracking)
 
-### PART 11: PERFORMANCE & POLISH (Post-MVP)
+### Part 11: Performance & Polish (Post-MVP)
 54. [Caching](#caching)
 55. [CDN Configuration](#cdn-configuration)
 56. [Nice to Have](#nice-to-have)
