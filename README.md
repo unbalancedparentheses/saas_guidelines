@@ -1,14 +1,52 @@
 # SaaS Application Checklist
 
-A comprehensive checklist for building production-ready SaaS applications with Elixir/Phoenix and React/TypeScript.
+A comprehensive guide for building production-ready SaaS applications with [Elixir](https://elixir-lang.org/)/[Phoenix](https://www.phoenixframework.org/) and [React](https://react.dev/)/[TypeScript](https://www.typescriptlang.org/).
 
 ---
 
-## Quick Start: How We Work
+## Philosophy
 
-Read this section to understand our stack, patterns, and philosophy in 5 minutes.
+Our approach to building SaaS applications.
 
-### Tech Stack at a Glance
+### API-Only Phoenix
+
+Phoenix serves REST/JSON only, no server-rendered HTML. React handles all UI, routing, and user interaction. This creates a clear separation: backend = data + logic, frontend = presentation.
+
+### Nix Everything, No Docker
+
+Reproducible dev environments with [Nix flakes](https://nixos.wiki/wiki/Flakes). Local services (Postgres, Redis) run via [devenv](https://devenv.sh/) or [process-compose](https://github.com/F1bonacc1/process-compose). Production servers run [NixOS](https://nixos.org/) for consistency. `nix develop` gets you a working environment instantly.
+
+### Offline-First Frontend
+
+[Dexie.js](https://dexie.org/) (IndexedDB) for local data persistence. API calls always fetch fresh data (no TanStack Query caching). Sync queue for mutations made offline. Works without network, syncs when reconnected.
+
+### Single Shared Repository
+
+All Ecto schemas in one `my_app_repo` app. All migrations in one place. Domain apps (auth, billing, etc.) contain only business logic. Single `Repo` module used by all apps.
+
+### UUIDs Everywhere
+
+No auto-increment IDs (prevents enumeration attacks). Generate IDs client-side when needed. Safe for distributed systems and data merging.
+
+### Deterministic Test Data
+
+No Faker or random generators. All test data uses explicit, predictable values. Seeds produce identical data on every run. Tests are reproducible and debuggable.
+
+### What to Build First
+
+1. **Foundation**: Nix env, Makefile, project structure, database
+2. **Admin & Demo**: Admin dashboard, user impersonation, seed data
+3. **Auth**: Login, signup, JWT tokens, password reset
+4. **Core Features**: Your actual product
+5. **Polish**: Error handling, loading states, accessibility
+
+---
+
+## Quick Reference
+
+Cheat sheet for our stack, structure, and workflows.
+
+### Tech Stack
 
 ```
 Backend:   Elixir + Phoenix (API only, no HTML views)
@@ -21,7 +59,7 @@ Dev:       Nix flakes (no Docker)
 Deploy:    Bare metal + NixOS + systemd + Caddy
 ```
 
-### Architecture Overview
+### Architecture
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
@@ -41,52 +79,16 @@ Deploy:    Bare metal + NixOS + systemd + Caddy
 
 | Layer | Library | Purpose |
 |-------|---------|---------|
-| HTTP | Bandit | Modern Elixir HTTP server |
-| Auth | Joken | JWT tokens (access + refresh) |
-| Passwords | Argon2 | Password hashing |
-| JSON | Jason | Fast serialization |
-| Jobs | Oban | Background job processing |
-| Frontend State | Zustand | Client state (UI only) |
-| Server State | TanStack Query | API calls (no caching) |
-| Forms | React Hook Form + Zod | Validation |
-| UI | shadcn/ui + Radix | Accessible components |
-| Toasts | Sonner | Notifications |
-
-### Core Principles
-
-**1. API-Only Phoenix**
-- Phoenix serves REST/JSON only, no server-rendered HTML
-- React handles all UI, routing, and user interaction
-- Clear separation: backend = data + logic, frontend = presentation
-
-**2. Nix Everything, No Docker**
-- Reproducible dev environments with Nix flakes
-- Local services (Postgres, Redis) via devenv or process-compose
-- Production servers run NixOS for consistency
-- `nix develop` gets you a working environment instantly
-
-**3. Offline-First Frontend**
-- Dexie.js (IndexedDB) for local data persistence
-- API calls always fetch fresh data (no TanStack Query caching)
-- Sync queue for mutations made offline
-- Works without network, syncs when reconnected
-
-**4. Single Shared Repository (Umbrella)**
-- All Ecto schemas in one `my_app_repo` app
-- All migrations in one place
-- Domain apps (auth, billing, etc.) contain only business logic
-- Single `Repo` module used by all apps
-
-**5. UUIDs Everywhere**
-- No auto-increment IDs (prevents enumeration attacks)
-- Generate IDs client-side when needed
-- Safe for distributed systems and data merging
-
-**6. Deterministic Test Data**
-- No Faker or random generators
-- All test data uses explicit, predictable values
-- Seeds produce identical data on every run
-- Tests are reproducible and debuggable
+| HTTP | [Bandit](https://github.com/mtrudel/bandit) | Modern Elixir HTTP server |
+| Auth | [Joken](https://github.com/joken-elixir/joken) | JWT tokens (access + refresh) |
+| Passwords | [Argon2](https://github.com/riverrun/argon2_elixir) | Password hashing |
+| JSON | [Jason](https://github.com/michalmuskala/jason) | Fast serialization |
+| Jobs | [Oban](https://github.com/sorentwo/oban) | Background job processing |
+| Frontend State | [Zustand](https://github.com/pmndrs/zustand) | Client state (UI only) |
+| Server State | [TanStack Query](https://tanstack.com/query) | API calls (no caching) |
+| Forms | [React Hook Form](https://react-hook-form.com/) + [Zod](https://zod.dev/) | Validation |
+| UI | [shadcn/ui](https://ui.shadcn.com/) + [Radix](https://www.radix-ui.com/) | Accessible components |
+| Toasts | [Sonner](https://sonner.emilkowal.ski/) | Notifications |
 
 ### Authentication Flow
 
@@ -97,8 +99,7 @@ Deploy:    Bare metal + NixOS + systemd + Caddy
 4. Logout:    DELETE /api/v1/auth/logout (revokes refresh_token)
 ```
 
-- Access tokens: 15 minutes, stateless JWT
-- Refresh tokens: 7 days, stored in database, rotated on use
+Access tokens: 15 minutes, stateless JWT. Refresh tokens: 7 days, stored in database, rotated on use.
 
 ### Project Structure
 
@@ -118,32 +119,19 @@ frontend/
     api/                # API client
 ```
 
-### Development Workflow
+### Development Commands
 
 ```bash
-# Enter dev environment (installs all deps via Nix)
-nix develop
-
-# Start services (Postgres, Redis, etc.)
-make services
-
-# Run backend
-make dev
-
-# Run frontend (separate terminal)
-cd frontend && pnpm dev
-
-# Run tests
-make test
-
-# Format code
-make format
-
-# Lint
-make lint
+nix develop          # Enter dev environment
+make services        # Start Postgres, Redis, etc.
+make dev             # Run backend
+cd frontend && pnpm dev  # Run frontend
+make test            # Run tests
+make format          # Format code
+make lint            # Lint code
 ```
 
-### Observability Stack
+### Observability
 
 ```
 Logs:     Structured JSON → Promtail → Grafana Loki
@@ -156,15 +144,9 @@ Every log includes: `timestamp`, `level`, `request_id`, `user_id`, `org_id`
 
 ### Security Defaults
 
-- HTTPS everywhere (HSTS enabled)
-- Secure cookies: `Secure`, `HttpOnly`, `SameSite=Lax`
-- Database connections use SSL/TLS
-- All input validated via Ecto changesets
-- CSP headers prevent XSS
-- Rate limiting on auth endpoints
-- Audit logging for sensitive operations
+HTTPS everywhere (HSTS enabled). Secure cookies: `Secure`, `HttpOnly`, `SameSite=Lax`. Database connections use SSL/TLS. All input validated via Ecto changesets. CSP headers prevent XSS. Rate limiting on auth endpoints. Audit logging for sensitive operations.
 
-### Deployment Model
+### Deployment
 
 ```
                     ┌─────────────┐
@@ -184,18 +166,7 @@ Every log includes: `timestamp`, `level`, `request_id`, `user_id`, `org_id`
                     └─────────────┘
 ```
 
-- Bare metal servers running NixOS
-- systemd manages Phoenix processes
-- Caddy handles TLS and load balancing
-- No Kubernetes, no Docker in production
-
-### What to Build First
-
-1. **Foundation**: Nix env, Makefile, project structure, database
-2. **Admin & Demo**: Admin dashboard, user impersonation, seed data
-3. **Auth**: Login, signup, JWT tokens, password reset
-4. **Core Features**: Your actual product
-5. **Polish**: Error handling, loading states, accessibility
+Bare metal servers running NixOS. systemd manages Phoenix processes. [Caddy](https://caddyserver.com/) handles TLS and load balancing. No Kubernetes, no Docker in production.
 
 ---
 
@@ -287,50 +258,50 @@ Every log includes: `timestamp`, `level`, `request_id`, `user_id`, `org_id`
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
-| Language | Elixir | Functional, concurrent, fault-tolerant |
-| Framework | Phoenix | Web framework, scalable real-time features |
-| HTTP Adapter | Bandit | Modern, pure Elixir (replaces Cowboy) |
-| Database | PostgreSQL | Primary data store |
-| Cache | Redis | Caching, sessions, rate limiting |
-| Search | Meilisearch | Full-text search |
-| Background Jobs | Oban | Persistent job queue with PostgreSQL |
-| JWT | Joken | Simple JWT encode/decode |
-| Password Hashing | Argon2 | argon2_elixir, current best practice |
-| JSON | Jason | Fast JSON serialization |
-| CORS | cors_plug | CORS middleware |
-| Email | Swoosh | Email composition and delivery |
-| Static Analysis | Dialyxir | Type checking and specs |
-| Code Coverage | ExCoveralls | Test coverage reporting |
+| Language | [Elixir](https://elixir-lang.org/) | Functional, concurrent, fault-tolerant |
+| Framework | [Phoenix](https://www.phoenixframework.org/) | Web framework, scalable real-time features |
+| HTTP Adapter | [Bandit](https://github.com/mtrudel/bandit) | Modern, pure Elixir (replaces Cowboy) |
+| Database | [PostgreSQL](https://www.postgresql.org/) | Primary data store |
+| Cache | [Redis](https://redis.io/) | Caching, sessions, rate limiting |
+| Search | [Meilisearch](https://www.meilisearch.com/) | Full-text search |
+| Background Jobs | [Oban](https://github.com/sorentwo/oban) | Persistent job queue with PostgreSQL |
+| JWT | [Joken](https://github.com/joken-elixir/joken) | Simple JWT encode/decode |
+| Password Hashing | [Argon2](https://github.com/riverrun/argon2_elixir) | argon2_elixir, current best practice |
+| JSON | [Jason](https://github.com/michalmuskala/jason) | Fast JSON serialization |
+| CORS | [cors_plug](https://github.com/mschae/cors_plug) | CORS middleware |
+| Email | [Swoosh](https://github.com/swoosh/swoosh) | Email composition and delivery |
+| Static Analysis | [Dialyxir](https://github.com/jeremyjh/dialyxir) | Type checking and specs |
+| Code Coverage | [ExCoveralls](https://github.com/parroty/excoveralls) | Test coverage reporting |
 
 ## Frontend
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
-| Language | TypeScript | Type-safe JavaScript |
-| Framework | React 18+ | UI library |
-| Build Tool | Vite | Fast bundler, HMR, ESM-native |
-| Package Manager | pnpm | Fast, disk-efficient, workspace support |
-| Routing | React Router | Client-side routing |
-| Server State | TanStack Query | Data fetching (no caching - see below) |
-| Client State | Zustand | Lightweight state management |
-| Forms | React Hook Form + Zod | Form handling with validation |
-| Styling | Tailwind CSS | Utility-first CSS |
-| Components | shadcn/ui + Radix UI | Accessible components (MIT license) |
-| Toasts | Sonner | Toast notifications |
-| Offline Storage | Dexie.js | IndexedDB wrapper for offline-first |
-| PWA | Workbox | Service worker tooling |
+| Language | [TypeScript](https://www.typescriptlang.org/) | Type-safe JavaScript |
+| Framework | [React 18+](https://react.dev/) | UI library |
+| Build Tool | [Vite](https://vitejs.dev/) | Fast bundler, HMR, ESM-native |
+| Package Manager | [pnpm](https://pnpm.io/) | Fast, disk-efficient, workspace support |
+| Routing | [React Router](https://reactrouter.com/) | Client-side routing |
+| Server State | [TanStack Query](https://tanstack.com/query) | Data fetching (no caching - see below) |
+| Client State | [Zustand](https://github.com/pmndrs/zustand) | Lightweight state management |
+| Forms | [React Hook Form](https://react-hook-form.com/) + [Zod](https://zod.dev/) | Form handling with validation |
+| Styling | [Tailwind CSS](https://tailwindcss.com/) | Utility-first CSS |
+| Components | [shadcn/ui](https://ui.shadcn.com/) + [Radix UI](https://www.radix-ui.com/) | Accessible components (MIT license) |
+| Toasts | [Sonner](https://sonner.emilkowal.ski/) | Toast notifications |
+| Offline Storage | [Dexie.js](https://dexie.org/) | IndexedDB wrapper for offline-first |
+| PWA | [Workbox](https://developer.chrome.com/docs/workbox/) | Service worker tooling |
 
 ## Infrastructure
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
-| Dev Environment | Nix Flakes | Reproducible, declarative setup |
-| Services (dev) | devenv / process-compose | Run Postgres, Redis locally via Nix |
-| Production | Bare metal + NixOS | Full control, reproducible servers |
-| CI/CD | GitHub Actions | Automated testing and deployment |
-| Monitoring | Prometheus + Grafana | Metrics and dashboards |
+| Dev Environment | [Nix Flakes](https://nixos.wiki/wiki/Flakes) | Reproducible, declarative setup |
+| Services (dev) | [devenv](https://devenv.sh/) / [process-compose](https://github.com/F1bonacc1/process-compose) | Run Postgres, Redis locally via Nix |
+| Production | Bare metal + [NixOS](https://nixos.org/) | Full control, reproducible servers |
+| CI/CD | [GitHub Actions](https://github.com/features/actions) | Automated testing and deployment |
+| Monitoring | [Prometheus](https://prometheus.io/) + [Grafana](https://grafana.com/) | Metrics and dashboards |
 | Logging | structured JSON logs | Centralized logging |
-| Error Tracking | Sentry | Error monitoring |
+| Error Tracking | [Sentry](https://sentry.io/) | Error monitoring |
 
 ---
 
@@ -555,7 +526,7 @@ For SPAs using JWT authentication, CSRF is less of a concern since tokens aren't
 
 # OAuth / Social Login
 
-Use `ueberauth` with provider strategies (`ueberauth_google`, `ueberauth_github`) for OAuth authentication. Store OAuth credentials in environment variables and configure callback URLs in each provider's developer console.
+Use [Ueberauth](https://github.com/ueberauth/ueberauth) with provider strategies ([ueberauth_google](https://github.com/ueberauth/ueberauth_google), [ueberauth_github](https://github.com/ueberauth/ueberauth_github)) for OAuth authentication. Store OAuth credentials in environment variables and configure callback URLs in each provider's developer console.
 
 Create a `user_identities` table to link OAuth accounts to users with fields: `user_id`, `provider`, `provider_uid`, `provider_email`, and `provider_data` (jsonb). Add a unique index on `(provider, provider_uid)`.
 
@@ -587,7 +558,7 @@ On verification: extract token from URL, verify signature and expiration, check 
 
 # Two-Factor Authentication (2FA)
 
-Use TOTP (RFC 6238) with `nimble_totp` for code generation/verification and `eqrcode` for QR codes. Works with Google Authenticator, Authy, and 1Password.
+Use TOTP (RFC 6238) with [NimbleTOTP](https://github.com/dashbitco/nimble_totp) for code generation/verification and [EQRCode](https://github.com/SiliconJungles/eqrcode) for QR codes. Works with Google Authenticator, Authy, and 1Password.
 
 Add to users table: `totp_secret` (encrypted), `totp_enabled`, `totp_enabled_at`, `backup_codes` (array of hashed codes), `backup_codes_generated_at`.
 
@@ -611,7 +582,7 @@ Show users their active sessions in account settings with device icons, browser 
 
 # Password Policies
 
-Minimum 12 characters (NIST recommendation), maximum 128 (prevent DoS). Check passwords against HaveIBeenPwned API using k-anonymity (send first 5 chars of SHA-1 hash, compare against returned list). Keep history of last 5 password hashes to prevent reuse.
+Minimum 12 characters (NIST recommendation), maximum 128 (prevent DoS). Check passwords against [HaveIBeenPwned](https://haveibeenpwned.com/API/v3) API using k-anonymity (send first 5 chars of SHA-1 hash, compare against returned list). Keep history of last 5 password hashes to prevent reuse.
 
 Store `password_hash` (Argon2), `password_changed_at`, and `password_history` (array) on the user. On password change: require current password, validate against all rules, add old hash to history, invalidate other sessions, send email notification.
 
@@ -701,7 +672,7 @@ Use React Hook Form + Zod for forms with type-safe validation matching API schem
 
 ## Error Boundaries
 
-Use `react-error-boundary` to catch JavaScript errors. Create root-level boundary for entire app and feature-level boundaries for isolation. Display user-friendly error with "Try Again" button and "Go Home" link. Log errors to Sentry with component stack and request ID for support.
+Use [react-error-boundary](https://github.com/bvaughn/react-error-boundary) to catch JavaScript errors. Create root-level boundary for entire app and feature-level boundaries for isolation. Display user-friendly error with "Try Again" button and "Go Home" link. Log errors to Sentry with component stack and request ID for support.
 
 ## Loading States
 
@@ -725,9 +696,9 @@ Use `Oban.insert/1` for immediate jobs, `scheduled_at` for delayed execution, an
 
 # Email
 
-Use Swoosh with a provider adapter (Postmark, SendGrid, or SES) for transactional emails. Create a base email module with default `from` and `reply-to`. Use sandbox adapter for tests and implement a preview route for development.
+Use [Swoosh](https://github.com/swoosh/swoosh) with a provider adapter ([Postmark](https://postmarkapp.com/), [SendGrid](https://sendgrid.com/), or [SES](https://aws.amazon.com/ses/)) for transactional emails. Create a base email module with default `from` and `reply-to`. Use sandbox adapter for tests and implement a preview route for development.
 
-Build templates with MJML for responsive layouts that work across email clients. Create a base layout with header, footer, and styles. Use inline styles for compatibility. Keep emails under 102KB to avoid Gmail clipping. Always include a plain text version.
+Build templates with [MJML](https://mjml.io/) for responsive layouts that work across email clients. Create a base layout with header, footer, and styles. Use inline styles for compatibility. Keep emails under 102KB to avoid Gmail clipping. Always include a plain text version.
 
 Send emails asynchronously via Oban EmailWorker to avoid blocking requests. Handle delivery failures with retries. Log email events and implement unsubscribe handling. Required email types: password reset, email verification, welcome, invoice/receipt, team invitation, activity notifications.
 
@@ -735,7 +706,7 @@ Send emails asynchronously via Oban EmailWorker to avoid blocking requests. Hand
 
 # Rate Limiting
 
-Use Hammer with Redis backend for distributed rate limiting with token bucket algorithm. Scope limits per-user for authenticated requests and per-IP for anonymous requests.
+Use [Hammer](https://github.com/ExHammer/hammer) with Redis backend for distributed rate limiting with token bucket algorithm. Scope limits per-user for authenticated requests and per-IP for anonymous requests.
 
 Limits by endpoint type: login/register (5/minute), password reset (3/hour), authenticated API (1000/minute), unauthenticated API (100/minute), file upload (10/minute).
 
@@ -765,7 +736,7 @@ Handle bulk reindexing for initial data load or schema changes.
 
 # Billing & Subscriptions
 
-Use Stripe for subscription billing. Create a Stripe Customer when users sign up. Implement checkout session creation for plan selection. Store subscription status locally (synced via webhooks).
+Use [Stripe](https://stripe.com/) for subscription billing. Create a Stripe Customer when users sign up. Implement checkout session creation for plan selection. Store subscription status locally (synced via webhooks).
 
 Handle webhooks idempotently: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, `invoice.payment_failed`. Update local subscription state on each event.
 
@@ -775,7 +746,7 @@ Build subscription management UI: plan selection, upgrade/downgrade, cancellatio
 
 # Feature Flags
 
-Use FunWithFlags with Redis backend for feature flags. Support multiple targeting types: boolean (on/off globally), actor-based (specific users), group-based (by plan or role), and percentage rollout for gradual releases.
+Use [FunWithFlags](https://github.com/tompave/fun_with_flags) with Redis backend for feature flags. Support multiple targeting types: boolean (on/off globally), actor-based (specific users), group-based (by plan or role), and percentage rollout for gradual releases.
 
 Check flags in controllers and contexts. Pass flag state to frontend for conditional UI. Use for gradual rollouts and A/B testing. Create an admin UI for flag management.
 
@@ -791,9 +762,9 @@ Implement an audit logging helper called from context functions. Consider async 
 
 # Internationalization
 
-Use Gettext on the backend—extract strings to PO files and translate error messages. Implement a locale plug that reads from `Accept-Language` header or user preference stored in database.
+Use [Gettext](https://github.com/elixir-gettext/gettext) on the backend—extract strings to PO files and translate error messages. Implement a locale plug that reads from `Accept-Language` header or user preference stored in database.
 
-Use react-i18next on the frontend with JSON translation files. Handle pluralization and format dates/numbers per locale. Implement a language switcher in the UI.
+Use [react-i18next](https://react.i18next.com/) on the frontend with JSON translation files. Handle pluralization and format dates/numbers per locale. Implement a language switcher in the UI.
 
 ---
 
@@ -1220,10 +1191,10 @@ Never commit secrets to repository. Use secret manager for production. Rotate se
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | Logging | Structured JSON | Parseable, searchable |
-| Log aggregation | Grafana Loki | Efficient, label-based, Grafana native |
-| Metrics | Prometheus | Standard, extensive ecosystem |
-| Tracing | OpenTelemetry | Vendor-neutral, comprehensive |
-| Errors | Sentry | Real-time alerts, context |
+| Log aggregation | [Grafana Loki](https://grafana.com/oss/loki/) | Efficient, label-based, Grafana native |
+| Metrics | [Prometheus](https://prometheus.io/) | Standard, extensive ecosystem |
+| Tracing | [OpenTelemetry](https://opentelemetry.io/) | Vendor-neutral, comprehensive |
+| Errors | [Sentry](https://sentry.io/) | Real-time alerts, context |
 
 ## Structured Logging
 
@@ -1431,7 +1402,7 @@ Always return `X-Request-ID` in responses so clients can reference it when repor
 
 # Circuit Breakers
 
-Protect your application from cascading failures when external services are down. Use `fuse` (battle-tested Erlang library) with per-service breakers to isolate failures.
+Protect your application from cascading failures when external services are down. Use [fuse](https://github.com/jlouis/fuse) (battle-tested Erlang library) with per-service breakers to isolate failures.
 
 ## Circuit Breaker States
 
@@ -1608,7 +1579,7 @@ Create dashboards for: overview (key health metrics), API performance, database,
 
 # Deployment
 
-Deploy to bare metal with NixOS for full control, cost-effectiveness, and reproducibility. Use rolling deployment for zero downtime. Build with Nix flakes for reproducible, cacheable builds. Store secrets with agenix or sops-nix (encrypted in git). Use Caddy or nginx for TLS termination and load balancing.
+Deploy to bare metal with NixOS for full control, cost-effectiveness, and reproducibility. Use rolling deployment for zero downtime. Build with Nix flakes for reproducible, cacheable builds. Store secrets with [agenix](https://github.com/ryantm/agenix) or [sops-nix](https://github.com/Mic92/sops-nix) (encrypted in git). Use Caddy or nginx for TLS termination and load balancing.
 
 ## Server Setup (NixOS)
 
@@ -1616,7 +1587,7 @@ Install NixOS on bare metal servers. Configure flake-based system configuration.
 
 ## Elixir Releases
 
-Configure `mix release` for production with runtime configuration (`config/runtime.exs`). Include migrations in release. Set up release health check script. Configure for clustering if needed (libcluster). Build release via Nix for reproducibility.
+Configure `mix release` for production with runtime configuration (`config/runtime.exs`). Include migrations in release. Set up release health check script. Configure for clustering if needed ([libcluster](https://github.com/bitwalker/libcluster)). Build release via Nix for reproducibility.
 
 ## NixOS Application Module
 
@@ -1636,11 +1607,11 @@ Run PostgreSQL on dedicated server or same host. Configure via NixOS module. Set
 
 ## Deployment Process
 
-Use deploy-rs or nixos-rebuild switch. Deploy from CI or local machine. Run migrations before switching. Health check before marking deploy complete. Automatic rollback on failure.
+Use [deploy-rs](https://github.com/serokell/deploy-rs) or nixos-rebuild switch. Deploy from CI or local machine. Run migrations before switching. Health check before marking deploy complete. Automatic rollback on failure.
 
 ## CI/CD Pipeline
 
-Run tests on every push. Build Nix derivation on merge to main. Push to Nix binary cache (Cachix). Deploy to staging automatically. Manual promotion to production. Tag releases in git.
+Run tests on every push. Build Nix derivation on merge to main. Push to Nix binary cache ([Cachix](https://cachix.org/)). Deploy to staging automatically. Manual promotion to production. Tag releases in git.
 
 ## High Availability (Optional)
 
@@ -1719,10 +1690,10 @@ Keep README up to date. Document setup process. Maintain CHANGELOG. Document API
 
 | Test Type | Backend Tool | Frontend Tool |
 |-----------|--------------|---------------|
-| Unit | ExUnit | Vitest |
-| Integration | ExUnit + Ecto Sandbox | React Testing Library |
-| E2E | - | Playwright |
-| Load | k6 | k6 |
+| Unit | [ExUnit](https://hexdocs.pm/ex_unit/) | [Vitest](https://vitest.dev/) |
+| Integration | ExUnit + Ecto Sandbox | [React Testing Library](https://testing-library.com/react) |
+| E2E | - | [Playwright](https://playwright.dev/) |
+| Load | [k6](https://k6.io/) | k6 |
 
 ## Deterministic Test Data Rule
 
@@ -1770,7 +1741,7 @@ Unit test utilities and hooks. Component tests with React Testing Library. Mock 
 
 ## E2E Testing (Playwright)
 
-End-to-end tests verify critical user journeys work correctly across the full stack. Use Playwright (cross-browser, fast, great DX). Run against staging or local with real backend and seeded data. Use Page Object Model for maintainable, reusable tests. Parallelize per-file with isolated test data.
+End-to-end tests verify critical user journeys work correctly across the full stack. Use [Playwright](https://playwright.dev/) (cross-browser, fast, great DX). Run against staging or local with real backend and seeded data. Use Page Object Model for maintainable, reusable tests. Parallelize per-file with isolated test data.
 
 ```
 frontend/
@@ -1953,7 +1924,7 @@ Notification types: system announcements, user mentions, comment replies, assign
 
 # Accessibility (A11Y)
 
-Build an accessible application that works for everyone. Target WCAG 2.1 AA (industry standard, legal compliance). Use Radix UI for accessible primitives. Use axe-core for automated accessibility testing.
+Build an accessible application that works for everyone. Target [WCAG 2.1 AA](https://www.w3.org/WAI/WCAG21/quickref/) (industry standard, legal compliance). Use [Radix UI](https://www.radix-ui.com/) for accessible primitives. Use [axe-core](https://github.com/dequelabs/axe-core) for automated accessibility testing.
 
 ## Semantic HTML
 
@@ -2015,7 +1986,7 @@ Track step completion rates. Identify drop-off points. Measure time to complete.
 
 # Product Analytics
 
-Track user behavior to understand usage patterns and improve the product. Use PostHog (self-hosted for privacy and cost control), Mixpanel, or Amplitude. Require consent for GDPR compliance.
+Track user behavior to understand usage patterns and improve the product. Use [PostHog](https://posthog.com/) (self-hosted for privacy and cost control), [Mixpanel](https://mixpanel.com/), or [Amplitude](https://amplitude.com/). Require consent for GDPR compliance.
 
 ## Setup
 
@@ -2059,7 +2030,7 @@ For cache headers: static assets get long TTL, HTML pages get `no-cache`, API re
 
 # Caching
 
-Use Redis with Redix client for distributed caching. Implement a cache module with `get/1`, `put/3`, `delete/1`, and `fetch/3` (get or compute). Use cache-aside pattern: check cache, on miss compute and store.
+Use Redis with [Redix](https://github.com/whatyouhide/redix) client for distributed caching. Implement a cache module with `get/1`, `put/3`, `delete/1`, and `fetch/3` (get or compute). Use cache-aside pattern: check cache, on miss compute and store.
 
 TTL by data type: user sessions (30 days), feature flags (1 minute), computed data (1 hour). Invalidate on data mutation. Use cache tags for bulk invalidation.
 
@@ -2131,7 +2102,7 @@ Notify team admins when invitations are accepted. Optionally send reminder email
 
 ## A/B Testing Framework
 
-Implement experiment assignment with user bucketing to randomly assign users to variants. Track experiment participation and collect metrics per variant. Build an analysis dashboard to evaluate results. Consider using Growthbook, Optimizely, or building a custom solution depending on your needs and scale.
+Implement experiment assignment with user bucketing to randomly assign users to variants. Track experiment participation and collect metrics per variant. Build an analysis dashboard to evaluate results. Consider using [GrowthBook](https://www.growthbook.io/), [Optimizely](https://www.optimizely.com/), or building a custom solution depending on your needs and scale.
 
 ## Referral System
 
@@ -2147,11 +2118,11 @@ Support CSV upload for batch data import. Validate all data before processing an
 
 ## Status Page
 
-Display service health publicly so users can check system status. Track incident history with postmortems. Allow users to subscribe to updates via email or RSS. Consider Statuspage.io, Instatus, or building a custom solution.
+Display service health publicly so users can check system status. Track incident history with postmortems. Allow users to subscribe to updates via email or RSS. Consider [Statuspage.io](https://www.atlassian.com/software/statuspage), [Instatus](https://instatus.com/), or building a custom solution.
 
 ## OpenTelemetry
 
-Add the OpenTelemetry SDK and instrument Phoenix and Ecto for automatic span creation. Configure an exporter for your observability backend (Jaeger, Honeycomb, Datadog, etc.). Add custom spans for important business operations. Correlate logs with traces using trace IDs for end-to-end request debugging.
+Add the [OpenTelemetry](https://opentelemetry.io/) SDK and instrument Phoenix and Ecto for automatic span creation. Configure an exporter for your observability backend ([Jaeger](https://www.jaegertracing.io/), [Honeycomb](https://www.honeycomb.io/), [Datadog](https://www.datadoghq.com/), etc.). Add custom spans for important business operations. Correlate logs with traces using trace IDs for end-to-end request debugging.
 
 ---
 
